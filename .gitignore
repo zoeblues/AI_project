@@ -1,0 +1,16 @@
+# Ignore python virtaul Env
+.venv
+venv
+
+# Ignore IDE files
+.idea
+
+# Ignore private .env files
+*.env
+.env
+
+# Ignore __pycache__
+__pycache__/
+
+# Ignore data folder
+data/
