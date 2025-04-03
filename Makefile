@@ -1,19 +1,24 @@
 
 ENV_NAME = DiffusionProject
-ENV_FILE = environment.yaml
+VENV_DIR := .venv
+PYTHON_BASE := python3
+PYTHON := .venv/bin/python
+
 
 create:
-	mamba env create -f $(ENV_FILE)
+	@echo "Creating virtual environment in $(VENV_DIR)..."
+	$(PYTHON_BASE) -m venv $(VENV_DIR)
+	@echo "Installing requirements..."
+	$(VENV_DIR)/bin/pip install --upgrade pip
+	$(VENV_DIR)/bin/pip install -r $(REQUIREMENTS); \
 
-update:
-	mamba env update -f $(ENV_FILE) --prune
 
-clean:
-	conda remove --name $(ENV_NAME) --all -y
+remove:
+	@echo "Removing virtual environment..."
+	rm -rf $(VENV_DIR)
 
 run:
-	conda run -n $(ENV_NAME) python file.py	
-
+	$(PYTHON) file.py	
 
 download_data:
-	conda run -n $(ENV_NAME) python scripts/download_animals_classification.py
+	$(PYTHON) scripts/download_animals_classification.py

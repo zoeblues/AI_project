@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
 	name='diffusion_lab',
 	version='0.1',
-	packages=['kagglehub'],
+	packages=[],
 	url='https://github.com/zoeblues/AI_project',
 	license='',
 	author='Filip&Zuzia',
