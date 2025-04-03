@@ -1,5 +1,4 @@
 
-ENV_NAME = DiffusionProject
 VENV_DIR := .venv
 PYTHON_BASE := python3
 PYTHON := .venv/bin/python
@@ -10,7 +9,7 @@ create:
 	$(PYTHON_BASE) -m venv $(VENV_DIR)
 	@echo "Installing requirements..."
 	$(VENV_DIR)/bin/pip install --upgrade pip
-	$(VENV_DIR)/bin/pip install -r $(REQUIREMENTS); \
+	$(VENV_DIR)/bin/pip install -r requirements.txt
 
 
 remove:
