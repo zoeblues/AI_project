@@ -21,3 +21,6 @@ run:
 
 download_data:
 	$(PYTHON) scripts/download_animals_classification.py
+
+create_csv:
+	$(PYTHON) scripts/img_data_to_csv.py

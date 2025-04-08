@@ -1,7 +1,7 @@
 import kagglehub
 import shutil
 import os
-import pandas as pd
+from img_data_to_csv import create_dataset_csv
 
 
 def download():
@@ -86,31 +86,10 @@ def reformat_simplify_structure():
 		shutil.rmtree("./data/Validation Data/")
 
 
-def create_dataset_csv():
-	# Dataset
-	dataset_csv = []
-	
-	dataset_dir = "./data/diffusion_training/"
-	for class_dir in os.listdir(dataset_dir):
-		class_dir_path = os.path.join(dataset_dir, class_dir)
-		# Make sure this is a directory
-		if not os.path.isdir(class_dir_path):
-			continue
-		for filename in os.listdir(class_dir_path):
-			# Make sure file is an image
-			if not any([filename.endswith(extension) for extension in [".jpg", ".png", ".jpeg"]]):
-				continue
-			# Create path and add to dataset
-			class_file_path = os.path.join(class_dir_path, filename)
-			dataset_csv.append({"label": class_dir, "path": class_file_path})
-	# With pandas save the dataset information
-	pd.DataFrame(dataset_csv).to_csv("./data/diffusion_training.csv", index=False)
-
-
 if __name__ == '__main__':
 	# WARNING!!! THE DATASET IS 20GB
 	data_path = download()
 	remove_original(data_path)
 	remove_not_needed_data()
 	reformat_simplify_structure()
-	create_dataset_csv()
+	create_dataset_csv('diffusion_training', 'data', file_name='diffusion_training.csv')
