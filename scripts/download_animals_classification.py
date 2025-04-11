@@ -34,8 +34,8 @@ def remove_not_needed_data():
 	if os.path.exists("./data/Interesting Data"):
 		shutil.rmtree("./data/Interesting Data")
 		print("Deleted: ./data/Interesting Data")
-	# Remove that that was forcibly rotated for classification generalization,
-	# Can be done by our self if necessary
+	# Remove that was forcibly rotated for classification generalization,
+	# Can be done by oneself if necessary
 	if os.path.exists("./data/Train Augmented"):
 		shutil.rmtree("./data/Train Augmented")
 		print("Deleted: ./data/Train Augmented")

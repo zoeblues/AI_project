@@ -1,0 +1,9 @@
+# config for input, output sizes and other predefined variables used in u-net architecture
+image_size: 256
+input_channels: 3
+output_channels: 3
+base_channels: 128
+num_down_blocks: 5
+time_embedding_dim: 512
+num_groups: 32
+
