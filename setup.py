@@ -8,5 +8,5 @@ setup(
 	license='',
 	author='Filip&Zuzia',
 	author_email='',
-	description='Project for Technical University subject AI, Image generation and in painting using Diffusion Models',
+	description='Project for Gdansk University of Technology subject AI, Image generation and inpainting using Diffusion Models',
 )
