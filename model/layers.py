@@ -1,3 +1,6 @@
+"""
+File taken from: https://github.com/mattroz/diffusion-ddpm/tree/main
+"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

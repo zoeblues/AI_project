@@ -1,3 +1,6 @@
+"""
+File taken from: https://github.com/mattroz/diffusion-ddpm/tree/main
+"""
 from layers import ConvDownBlock, \
     AttentionDownBlock, \
     AttentionUpBlock, \
