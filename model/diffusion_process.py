@@ -48,3 +48,28 @@ class NoiseScheduler:
 
     return sqrt_alpha_cumprod * initial_sample + sqrt_one_minus_alpha_cumprod * noise
     '''
+
+    # sample x_{t-1} given x_t and the predicted noise at specific timestep
+    def reverse_diffusion_step(self, x_t, predicted_noise, timestep):
+        x_0_pred = (x_t - self.sqrt_one_minus_alpha_cum_prod[timestep] * predicted_noise) \
+                   / self.sqrt_alpha_cum_prod[timestep]
+        x_0_pred = torch.clamp(x_0_pred, -1., 1.)
+
+        # mean of the posterior q(x_{t-1} | x_t, x_0)
+        posterior_mean = x_t - (self.all_beta[timestep] * predicted_noise) \
+                         / self.sqrt_one_minus_alpha_cum_prod[timestep]
+        posterior_mean = posterior_mean / self.all_alpha[timestep].sqrt()
+
+        if timestep == 0:
+            return posterior_mean, x_0_pred
+        # variance and standard deviation of the posterior
+        posterior_variance = (1 - self.alpha_cum_prod[timestep - 1]) \
+                             / (1 - self.alpha_cum_prod[timestep])
+        posterior_variance *= self.all_beta[timestep]
+        std_dev = posterior_variance.sqrt()
+
+        noise = torch.randn_like(x_t)
+        x_prev = posterior_mean + std_dev * noise
+
+        return x_prev, x_0_pred
+
