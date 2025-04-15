@@ -40,17 +40,18 @@ class CosineNoiseScheduler(NoiseScheduler):
 	"""
 	def __init__(self, n_timesteps=1000, s=0.008):
 		super().__init__(n_timesteps)
-		
 		x = torch.linspace(0, n_timesteps, n_timesteps + 1)
+		
 		# Calculate alpha_bar according to the formula
 		alphas_bar = torch.cos(((x / n_timesteps) + s) / (1 + s) * np.pi * 0.5) ** 2
 		alphas_bar = alphas_bar / alphas_bar[0]
-		# Calculate beta in order to clip it, for numerical stability
+		# Calculate beta in order to clip it, for numerical stability  # todo: test if necessary
 		betas = 1 - (alphas_bar[1:] / alphas_bar[:-1])
 		betas = torch.clip(betas, 0.0001, 0.9999)
 		# Calculate back into alpha_bar from beta
 		alphas = 1.0 - betas
 		alpha_bars = torch.cumprod(alphas, dim=0)
+		
 		# Final calculation of sqrt_alphas
 		self.sqrt_alpha_bar = alpha_bars ** 0.5
 		self.sqrt_one_minus_alpha_bar = (1 - alpha_bars) ** 0.5
