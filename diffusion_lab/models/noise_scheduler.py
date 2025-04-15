@@ -10,14 +10,14 @@ class NoiseScheduler:
 		self.T = n_timesteps
 		
 		# to be overwritten by children
-		self.sqrt_alpha_hat = torch.zeros(n_timesteps)
-		self.sqrt_one_minus_alpha_hat = torch.zeros(n_timesteps)
+		self.sqrt_alpha_bar = torch.zeros(n_timesteps)
+		self.sqrt_one_minus_alpha_bar = torch.zeros(n_timesteps)
 	
 	def q_forward(self, x_0, t, device='cpu'):
 		"""
 		Forward diffusion process, adding Gaussian noise to the image :math:`x_0`.
 
-		Forward: :math:`q(x_t | x_0 ) = \\mathcal{N}(x_t;\\sqrt{\\alpha_t}x_0, (1-\\alpha_t)\\textbf{I})`
+		Forward: :math:`q(x_t | x_0 ) = \\mathcal{N}(x_t;\\sqrt{\\alpha_t}x_0, \\sqrt{(1-\\alpha_t)}\\textbf{I})`
 
 		Noising: :math:`x_t = \\sqrt{\\alpha_t}x_0 + \sqrt{1-\\alpha_t}\\epsilon`
 
@@ -28,7 +28,7 @@ class NoiseScheduler:
 		"""
 		
 		epsilon = torch.rand_like(x_0, device=device)
-		x_t = self.sqrt_alpha_hat[t][:, None, None, None] * x_0 + self.sqrt_one_minus_alpha_hat[t][:, None, None, None] * epsilon
+		x_t = self.sqrt_alpha_bar[t][:, None, None, None] * x_0 + self.sqrt_one_minus_alpha_bar[t][:, None, None, None] * epsilon
 		
 		return x_t
 
