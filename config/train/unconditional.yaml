@@ -1,0 +1,9 @@
+defaults:
+  - optimizer: adam
+
+name: unconditional
+params:
+  epochs: 1_000
+  bach_size: 64
+  device: mps
+  dataset: ${hydra:runtime.cwd}/data/diffusion_training.csv

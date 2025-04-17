@@ -14,3 +14,6 @@ __pycache__/
 
 # Ignore data folder
 data/
+
+# Ignore output/ folder with inromation from traning
+outputs/

@@ -26,4 +26,4 @@ create_csv:
 	$(PYTHON) scripts/img_data_to_csv.py
 
 train_diffusion:
-	$(PYTHON) diffusion_lab/training/training_diffusion.py
+	$(PYTHON) -m diffusion_lab.training.training_diffusion
