@@ -2,8 +2,11 @@ defaults:
   - optimizer: adam
 
 name: unconditional
+run_name: run-0
 params:
+  timesteps: 1000
   epochs: 1_000
-  bach_size: 64
-  device: mps
+  bach_size: 1
+  device: cpu
   dataset: ${hydra:runtime.cwd}/data/diffusion_training.csv
+  model_path: model.pth

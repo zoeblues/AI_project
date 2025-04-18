@@ -4,7 +4,7 @@ import numpy as np
 
 class NoiseScheduler:
 	"""
-	Base class for noise scheduler. Implementing the methods for forward noising process.
+	Base class for noise scheduler. Implementing the methods for a forward noising process.
 	"""
 	def __init__(self, n_timesteps=1000):
 		self.T = n_timesteps
@@ -21,16 +21,16 @@ class NoiseScheduler:
 
 		Noising: :math:`x_t = \\sqrt{\\alpha_t}x_0 + \sqrt{1-\\alpha_t}\\epsilon`
 
-		:param x_0: batch of image tensors, shape: (b, c, h, w)
-		:param t: batch of time steps, for the diffusion process, shape: (b, 1)
-		:param device: device on which to generate the noise: "cpu"
-		:return: noised image tensors, shape: (b, c, h, w)
+		:param x_0: Batch of image tensors, shape: (b, c, h, w)
+		:param t: Batch of time steps, for the diffusion process, shape: (b, 1)
+		:param device: Device on which to generate the noise: "cpu"
+		:return: Noised image tensors, shape: (b, c, h, w)
 		"""
 		
 		epsilon = torch.rand_like(x_0, device=device)
 		x_t = self.sqrt_alpha_bar[t][:, None, None, None] * x_0 + self.sqrt_one_minus_alpha_bar[t][:, None, None, None] * epsilon
 		
-		return x_t
+		return x_t, epsilon
 
 
 class CosineNoiseScheduler(NoiseScheduler):

@@ -1,4 +1,4 @@
 name: cosine
 type: diffusion_lab.models.noise_scheduler.CosineNoiseScheduler
 params:
-  n_timesteps: 1000
+  s: 0.008

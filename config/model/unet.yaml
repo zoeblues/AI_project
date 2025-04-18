@@ -1,4 +1,4 @@
 name: unet
 type: diffusion_lab.models.diffusion.UNet
 params:
-  
+  image_size: 128
