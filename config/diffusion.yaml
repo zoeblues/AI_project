@@ -2,3 +2,4 @@ defaults:
   - model: unet
   - schedule: cosine
   - train: unconditional
+  - override hydra/job_logging: custom

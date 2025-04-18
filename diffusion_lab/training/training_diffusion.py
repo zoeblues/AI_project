@@ -1,14 +1,19 @@
-import torch
-from torch.utils.data import DataLoader
-
 import hydra
-from omegaconf import DictConfig, OmegaConf
+import logging
+import logging.config
 import importlib
+from omegaconf import DictConfig, OmegaConf
+
+from torch.utils.data import DataLoader
 
 from diffusion_lab.datasets.dataset_diffusion import DiffusionDataset
 
 
-def train(model, scheduler, loader, optimizer, device):
+log = logging.getLogger(__name__)
+
+
+def train(model, scheduler, loader, optimizer, train_cfg, device):
+	log.info("Starting training...")
 	model = model.to(device)  # to make sure it's on intended device
 	
 	pass
@@ -16,8 +21,6 @@ def train(model, scheduler, loader, optimizer, device):
 
 @hydra.main(config_path="../../config", config_name="diffusion", version_base="1.3")
 def main(cfg: DictConfig):
-	print(OmegaConf.to_yaml(cfg))  # Print configuration
-	
 	dataset = DiffusionDataset(dataset_path=cfg.train.params.dataset)
 	loader = DataLoader(dataset, batch_size=cfg.train.params.bach_size, shuffle=True)  # todo: config
 	
@@ -34,7 +37,7 @@ def main(cfg: DictConfig):
 	sche_path, sche_name = cfg.schedule.type.rsplit(".", maxsplit=1)
 	scheduler = getattr(importlib.import_module(sche_path), sche_name)(**cfg.schedule.params)
 	
-	train(model, scheduler, loader, optimizer, device=cfg.train.params.device)
+	train(model, scheduler, loader, optimizer, cfg.train.params, device=cfg.train.params.device)
 
 
 if __name__ == '__main__':

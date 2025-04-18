@@ -1,0 +1,24 @@
+version: 1
+formatters:
+  simple_log:
+    format: '[%(levelname)s][%(asctime)s]: %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: DEBUG 
+    formatter: simple_log
+    stream: ext://sys.stdout
+  file:
+    class: logging.FileHandler
+    level: DEBUG 
+    formatter: simple_log
+    filename: ${hydra.runtime.output_dir}/train.log
+    mode: a
+
+root:
+  level: DEBUG 
+  handlers: [console, file]
+
+disable_existing_loggers: false
