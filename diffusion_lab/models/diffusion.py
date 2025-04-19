@@ -1,13 +1,15 @@
 """
 File taken from: https://github.com/mattroz/diffusion-ddpm/tree/main
 """
-from layers import ConvDownBlock, \
+from diffusion_lab.models.layers import ConvDownBlock, \
     AttentionDownBlock, \
     AttentionUpBlock, \
     TransformerPositionEmbedding, \
     ConvUpBlock
 import torch
 import torch.nn as nn
+
+
 class UNet(nn.Module):
     def __init__(self, image_size=256, input_channels=3):
         super().__init__()
