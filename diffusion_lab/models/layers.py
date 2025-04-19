@@ -4,12 +4,25 @@ File taken from: https://github.com/mattroz/diffusion-ddpm/tree/main
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import yaml
 
+# Load from config
+def load_config(path="config/train/prep_data.yml"): #todo change path so its correct
+    with open(path, "r") as f:
+        return yaml.safe_load(f)
 
-# Create new neural network component based on nn.Module
+CONFIG = load_config()
 '''
 from paper "Attention is all you need"
+Based on Appendix B from "DDPM" paper
+ - 32x32 models use four feature map resolution (32x32 to 4x4)
+ - 256x256 models use six such maps
+ - all models have two convolutional residual blocks per resolution level
+ - all models have 16x16 resolution between the convolutional blocks
+ - diffusion time t is specified by Transformer sinusoidal position embedding
 '''
+
+# Generate sinusoidal time embeddings
 class TransformerPositionEmbedding(nn.Module):
     def __init__(self, dimension, max_timesteps=1000):
         super(TransformerPositionEmbedding, self).__init__()
@@ -28,7 +41,7 @@ class TransformerPositionEmbedding(nn.Module):
     def forward(self, timestep):
         return self.pe_matrix[timestep].to(timestep.device)
 
-# based on a ddpm paper we take group normalization
+# Based on a ddpm paper we take group normalization instead of weight
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, groups=8):
         super().__init__()
@@ -42,10 +55,26 @@ class ConvBlock(nn.Module):
         x = self.act(x)
         return x
 
+class ResNetBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, time_emb_ch, groups=8):
+        super().__init__()
+        self.time_proj = nn.Sequential(nn.SiLU(), nn.Linear(time_emb_ch, out_channels))
+        self.block1 = ConvBlock(in_channels, out_channels, groups)
+        self.block2 = ConvBlock(out_channels, out_channels, groups)
+        self.res_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
+
+    def forward(self, x, t_emb):
+        h = self.block1(x)
+        if self.time_proj:
+            t_emb = self.time_proj(t_emb)[:, :, None, None]
+            h = h + t_emb
+        h = self.block2(h)
+        return h + self.res_conv(x)
+
 class DownSampleBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride, padding):
         super(DownSampleBlock, self).__init__()
-        self.conv = nn.Conv2d(in_channels,out_channels, kernel_size=3, padding=padding)
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=padding)
 
     def forward(self, input_tensor):
         x = self.conv(input_tensor)
@@ -116,7 +145,7 @@ class ConvUpBlock(nn.Module):
 
  # SelfAttentionBlocks in original paper they are applied on 16x16, here it is 32x32
 class SelfAttentionBlock(nn.Module):
-   def __init__(self, num_heads, in_channels, num_groups=32, embedding_dim=256):
+   def __init__(self, num_heads, in_channels, num_groups=32, embedding_dim=256): #todo into config
        super(SelfAttentionBlock, self).__init__()
        self.num_heads = num_heads
        self.d_model = embedding_dim
@@ -287,36 +316,3 @@ class AttentionUpBlock(nn.Module):
         if self.upsample:
             x = self.upsample(x)
         return x
-
-
-class ResNetBlock(nn.Module):
-    """
-    In the original DDPM paper Wide ResNet was used
-    (https://arxiv.org/pdf/1605.07146.pdf).
-    """
-
-    def __init__(self, in_channels, out_channels, *, time_emb_channels=None, num_groups=8):
-        super(ResNetBlock, self).__init__()
-        self.time_embedding_projectile = (
-            nn.Sequential(nn.SiLU(), nn.Linear(time_emb_channels, out_channels))
-            if time_emb_channels
-            else None
-        )
-
-        self.block1 = ConvBlock(in_channels, out_channels, groups=num_groups)
-        self.block2 = ConvBlock(out_channels, out_channels, groups=num_groups)
-        self.residual_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
-
-    def forward(self, x, time_embedding=None):
-        input_tensor = x
-        h = self.block1(x)
-        # According to authors implementations, they inject timestep embedding into the network
-        # using MLP after the first conv block in all the ResNet blocks
-        # (https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0706c543/diffusion_tf/models/unet.py#L49)
-
-        time_emb = self.time_embedding_projectile(time_embedding)
-        time_emb = time_emb[:, :, None, None]
-        x = time_emb + h
-
-        x = self.block2(x)
-        return x + self.residual_conv(input_tensor)

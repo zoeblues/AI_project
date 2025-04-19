@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import yaml
 # Load the config for unet
-with open("prep_data.yml", "r") as f:
+with open("unet.yml", "r") as f:
     config=yaml.safe_load(f)
 
 class UNet(nn.Module):
@@ -21,20 +21,25 @@ class UNet(nn.Module):
         attention_heads = config["attention_heads"]
         output_channels = config["output_channels"]
 
+        # Convert image into a base feature map
         self.initial_conv = nn.Conv2d(
             in_channels = input_channels,
             out_channels=base,
             kernel_size=3,
             stride=1,
-            padding='same')
+            padding=1
+        )
 
-
+        # Embed a time value into a feature vector
         self.positional_encoding = nn.Sequential(
             TransformerPositionEmbedding(dimension=base),
             nn.Linear(base, time_emb_channels),
             nn.GELU(),
             nn.Linear(time_emb_channels, time_emb_channels)
-)
+        )
+
+        # Reduce the spatial size (height/width) of the image
+        # Increase the number of feature channels
         self.downsample_blocks = nn.ModuleList([
             ConvDownBlock(base, base, 2, num_groups, time_emb_channels),
             ConvDownBlock(base, base, 2, num_groups, time_emb_channels),
@@ -45,6 +50,7 @@ class UNet(nn.Module):
 
         self.bottleneck = AttentionDownBlock(base * 4, base * 4, 2, attention_heads, num_groups, time_emb_channels, downsample=False)
 
+        # Upscale the features and merge them with the corresponding features from downsampling path
         self.upsample_blocks = nn.ModuleList([
             ConvUpBlock(base * 8, base * 4, 2, num_groups, time_emb_channels),
             AttentionUpBlock(base * 4 + base * 2, base * 2, 2, attention_heads, num_groups, time_emb_channels),
@@ -53,6 +59,7 @@ class UNet(nn.Module):
             ConvUpBlock(base * 2, base, 2, num_groups, time_emb_channels)
         ])
 
+        # Final image output, that maps the last processed tensor back to desired num of channels
         self.output_conv = nn.Sequential(
             nn.GroupNorm(num_channels=base * 2, num_groups=num_groups),
             nn.SiLU(),
@@ -60,22 +67,27 @@ class UNet(nn.Module):
         )
 
     def forward(self, input_tensor, time):
+        # Embed the time
         time_encoded = self.positional_encoding(time)
+        # Apply initial conv to image
+        x = self.initial_conv(input_tensor)
 
-        initial_x = self.initial_conv(input_tensor)
-        states_for_skip_connections = [initial_x]
+        # Save for skip connections - prevent network from forgetting input structure
+        skip_connections = [x]
 
-        x = initial_x
+        # Downsample path, save each output for skip connections
         for block in self.downsample_blocks:
             x = block(x, time_encoded)
-            states_for_skip_connections.append(x)
+            skip_connections.append(x)
 
-        states_for_skip_connections = list(reversed(states_for_skip_connections))
         x = self.bottleneck(x, time_encoded)
 
-        for block, skip in zip(self.upsample_blocks, states_for_skip_connections):
+        # Reverse skip list and remove the last one (bottleneck)
+        skip_connections = list(reversed(skip_connections[:-1]))
+
+        # Upsample path with skip connections
+        for block, skip in zip(self.upsample_blocks, skip_connections):
             x = torch.cat([x, skip], dim=1)
             x = block(x, time_encoded)
 
-        x = torch.cat([x, states_for_skip_connections[-1]], dim=1)
         return self.output_conv(x)

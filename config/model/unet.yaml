@@ -1,7 +1,7 @@
 name: unet
 type: diffusion_lab.models.diffusion.UNet
 params:
-  image_size: 256
+  image_size: 64
   input_channels: 3
   base_channels: 128
   num_groups: 32
