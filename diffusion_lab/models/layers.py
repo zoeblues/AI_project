@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-# create new neural network component based on nn.Module
+# Create new neural network component based on nn.Module
 '''
 from paper "Attention is all you need"
 '''

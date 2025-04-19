@@ -1,7 +1,0 @@
-image_size: 256
-input_channels: 3
-base_channels: 128
-num_groups: 32
-time_embedding_factor: 4
-attention_heads: 4
-output_channels: 3
