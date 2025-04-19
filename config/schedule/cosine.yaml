@@ -2,3 +2,6 @@ name: cosine
 type: diffusion_lab.models.noise_scheduler.CosineNoiseScheduler
 params:
   s: 0.008
+  n_timesteps: 1000
+  beta_start: 0.001
+  beta_end: 0.02
