@@ -27,3 +27,6 @@ create_csv:
 
 train_diffusion:
 	$(PYTHON) -m diffusion_lab.training.training_diffusion
+
+mlflow-ui:
+	$(PYTHON) scripts/mlflow_run.py
