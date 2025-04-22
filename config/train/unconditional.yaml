@@ -6,7 +6,7 @@ run_name: run-0
 params:
   timesteps: 1000
   epochs: 1_000
-  bach_size: 1
-  device: cpu
+  bach_size: 16
+  device: mps
   dataset: ${hydra:runtime.cwd}/data/diffusion_training.csv
   model_path: model.pth

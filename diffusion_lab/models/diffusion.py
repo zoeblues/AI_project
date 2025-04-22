@@ -14,8 +14,11 @@ import yaml
 
 
 class UNet(nn.Module):
-	def __init__(self, **kwargs):
+	def __init__(self, device='cpu', **kwargs):
 		super().__init__()
+		
+		# Remember the target device
+		self.device = device
 		
 		# Convert image into a base feature map
 		self.initial_conv = nn.Conv2d(
@@ -28,7 +31,7 @@ class UNet(nn.Module):
 		
 		# Embed a time value into a feature vector
 		self.positional_encoding = nn.Sequential(
-			TransformerPositionEmbedding(dimension=64),
+			TransformerPositionEmbedding(dimension=64, device=self.device),
 			nn.Linear(64, 256),
 			nn.GELU(),
 			nn.Linear(256, 256)

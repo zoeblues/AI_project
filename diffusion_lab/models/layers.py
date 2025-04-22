@@ -22,20 +22,20 @@ class TransformerPositionEmbedding(nn.Module):
 	From paper "Attention Is All You Need", section 3.5
 	"""
 	
-	def __init__(self, dimension, max_timesteps=1000):
+	def __init__(self, dimension, max_timesteps=1000, device='cpu'):
 		super(TransformerPositionEmbedding, self).__init__()
 		assert dimension % 2 == 0, "Embedding dimension must be even"
 		self.dimension = dimension
-		self.pe_matrix = torch.zeros(max_timesteps, dimension)
+		self.pe_matrix = torch.zeros(max_timesteps, dimension, device=device)
 		# Gather all the even dimensions across the embedding vector
-		even_indices = torch.arange(0, self.dimension, 2)
+		even_indices = torch.arange(0, self.dimension, 2, device=device)
 		# Calculate the term using log transforms for faster calculations
 		# (https://stackoverflow.com/questions/17891595/pow-vs-exp-performance)
-		log_term = torch.log(torch.tensor(10000.0)) / self.dimension
+		log_term = torch.log(torch.tensor(10000.0, device=device)) / self.dimension
 		div_term = torch.exp(even_indices * -log_term)
 		
 		# Precompute positional encoding matrix based on odd/even timesteps
-		timesteps = torch.arange(max_timesteps).unsqueeze(1)
+		timesteps = torch.arange(max_timesteps, device=device).unsqueeze(1)
 		self.pe_matrix[:, 0::2] = torch.sin(timesteps * div_term)
 		self.pe_matrix[:, 1::2] = torch.cos(timesteps * div_term)
 	

@@ -31,6 +31,7 @@ def train(model, scheduler, loader, optimizer, train_cfg, device):
 			running_loss = 0.0
 			progress_bar = tqdm(loader, desc=f"Epoch: {epoch+1}/{train_cfg.params.epochs}")
 			for batch in progress_bar:
+				batch = batch.to(device)
 				
 				timestep = torch.randint(1, train_cfg.params.timesteps, size=(batch.shape[0],), device=device)
 				x_t, epsilon = scheduler.q_forward(batch, timestep)
@@ -62,7 +63,7 @@ def main(cfg: DictConfig):
 	# Loading model dynamically, based on config.
 	model_path, model_name = cfg.model.type.rsplit(".", maxsplit=1)  # get module path, and class name
 	model_cls = getattr(importlib.import_module(model_path), model_name)  # dynamic load a given class from a library
-	model = model_cls(**cfg.model.params)  # create instance of imported class, with parameters from config
+	model = model_cls(**cfg.model.params, device=cfg.train.params.device)  # create instance of imported class, with parameters from config
 	
 	# Dynamic load of optimizer
 	opti_path, opti_name = cfg.train.optimizer.type.rsplit(".", maxsplit=1)
@@ -70,7 +71,8 @@ def main(cfg: DictConfig):
 	
 	# Dynamic load of noise scheduler
 	sche_path, sche_name = cfg.schedule.type.rsplit(".", maxsplit=1)
-	scheduler = getattr(importlib.import_module(sche_path), sche_name)(cfg.train.params.timesteps, **cfg.schedule.params)
+	scheduler_cls = getattr(importlib.import_module(sche_path), sche_name)
+	scheduler = scheduler_cls(**cfg.schedule.params, n_timesteps=cfg.train.params.timesteps, device=cfg.train.params.device)
 	
 	log.info("Options loaded successfully!")
 	
