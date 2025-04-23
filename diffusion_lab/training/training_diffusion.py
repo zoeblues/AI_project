@@ -1,4 +1,5 @@
 import os
+from os.path import join as pjoin
 import time
 
 import hydra
@@ -71,11 +72,11 @@ def train(model, scheduler, loader, optimizer, train_cfg, device):
 			
 			if epoch % train_cfg.params.log_step == 0:
 				log.info(f"Epoch {epoch + 1}/{train_cfg.params.epochs} Loss: {avg_loss}")
-			if epoch % train_cfg.params.save_step == 0:
-				torch.save(model.state_dict(), os.path.join(train_cfg.params.model_path, f"step-{epoch:08d}.pth"))
+			if epoch % train_cfg.params.save_step == 0 and epoch != 0:
+				torch.save(model.state_dict(), pjoin(train_cfg.params.save_path, f"step-{epoch}.pth"))
 	
 	# Save model
-	torch.save(model.state_dict(), train_cfg.params.model_path)
+	torch.save(model.state_dict(), pjoin(train_cfg.params.save_path, f"{train_cfg.params.model_name}.pth"))
 
 
 @hydra.main(config_path="../../config", config_name="diffusion", version_base="1.3")
@@ -83,14 +84,17 @@ def main(cfg: DictConfig):
 	mlflow.set_experiment(cfg.project.name)
 	
 	dataset = DiffusionDataset(dataset_path=cfg.train.params.dataset)
-	loader = DataLoader(dataset, batch_size=cfg.train.params.bach_size, shuffle=True, num_workers=cfg.train.params.num_workers, persistent_workers=True, pin_memory=True)  # todo: config
+	loader = DataLoader(dataset, batch_size=cfg.train.params.bach_size, shuffle=True, **cfg.train.loader.params)
 	
 	# Loading model dynamically, based on config.
 	model_path, model_name = cfg.model.type.rsplit(".", maxsplit=1)  # get module path, and class name
 	model_cls = getattr(importlib.import_module(model_path), model_name)  # dynamic load a given class from a library
 	model = model_cls(**cfg.model.params, device=cfg.train.params.device)  # create an instance, with params from config
+	if 'load_path' in cfg.train.params and 'load_timestep' in cfg.train.params and cfg.train.params.load_timestep != 0:
+		model.load_state_dict(torch.load(pjoin(cfg.train.params.load_path, f"{cfg.train.params.load_timestep}.pth")))
+	
 	# make sure the folder for train steps exists, create if it doesn't.
-	os.makedirs(cfg.train.params.model_path, exist_ok=True)
+	os.makedirs(cfg.train.params.save_path, exist_ok=True)
 	
 	# Dynamic load of optimizer
 	opti_path, opti_name = cfg.train.optimizer.type.rsplit(".", maxsplit=1)
