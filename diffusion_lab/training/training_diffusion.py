@@ -103,11 +103,9 @@ def main(cfg: DictConfig):
 	# Dynamic load of noise scheduler
 	sche_path, sche_name = cfg.schedule.type.rsplit(".", maxsplit=1)
 	scheduler_cls = getattr(importlib.import_module(sche_path), sche_name)
-	scheduler = scheduler_cls(**cfg.schedule.params, n_timesteps=cfg.train.params.timesteps,
-	                          device=cfg.train.params.device)
+	scheduler = scheduler_cls(**cfg.schedule.params, n_timesteps=cfg.train.params.timesteps, device=cfg.train.params.device)
 	
 	log.info("Options loaded successfully!")
-	
 	train(model, scheduler, loader, optimizer, cfg.train, device=cfg.train.params.device)
 
 
