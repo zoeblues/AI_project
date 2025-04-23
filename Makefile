@@ -24,3 +24,9 @@ download_data:
 
 create_csv:
 	$(PYTHON) scripts/img_data_to_csv.py
+
+train_diffusion:
+	$(PYTHON) -m diffusion_lab.training.training_diffusion
+
+mlflow-ui:
+	$(PYTHON) scripts/mlflow_run.py

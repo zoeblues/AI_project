@@ -6,6 +6,7 @@ import pandas as pd
 
 # Default Transformations for image
 _default_transform = transforms.Compose([
+	transforms.Resize(128),
 	transforms.ToTensor(),  # Convert image to tensor
 	transforms.Normalize(  # Normalize RGB pixel values: [0, 255] -> [-1, 1]
 		mean=[0.5, 0.5, 0.5],
@@ -16,10 +17,10 @@ _default_transform = transforms.Compose([
 
 class DiffusionDataset(Dataset):
 	def __init__(self, dataset_path, transform=None):
-		data = pd.read_csv(dataset_path)
-		# Save the transformation provided by th user, or use default
+		data = pd.read_csv(dataset_path)[:1000]
+		# Save the transformation provided by the user or use default
 		self.transform = transform if transform is not None else _default_transform
-		# Remember, to change pandas.Series into list or np.array for speed: `.tolist()` or `.to_numpy()`
+		# Remember to change pandas.Series into a list or np.array for speed: `.tolist()` or `.to_numpy()`
 		self.paths = data['path'].tolist()
 		# One-Hot Encoding
 		self.labels_lookup = sorted(data['label'].unique().tolist())

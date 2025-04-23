@@ -1,0 +1,12 @@
+params:
+  image_size: 256
+  base_channels: 64
+  num_res_blocks: 2
+  num_groups: 8
+  num_heads: 4
+  time_emb_dim: 256
+  max_timesteps: 1000
+
+  # levels (based on image size)
+  # 4 levels -> 64x64  5 levels -> 128x128  6 levels -> 256x256
+  down_blocks: 4

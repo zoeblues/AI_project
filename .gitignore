@@ -14,3 +14,9 @@ __pycache__/
 
 # Ignore data folder
 data/
+
+# Ignore output/ folder with inromation from traning
+outputs/
+
+# Ignore ML Flow folder
+mlruns/
