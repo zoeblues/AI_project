@@ -8,10 +8,10 @@ params:
   timesteps: 1_000
   epochs: 1_000
   bach_size: 16
+  accum_steps: 1
   device: mps
   # Dataset & Dataloader
   dataset: ${hydra:runtime.cwd}/data/diffusion_training.csv
-  num_workers: 2
   # Additional info, model saving/loading
   save_path: ${hydra:runtime.output_dir}/steps
   model_name: uncond_unet

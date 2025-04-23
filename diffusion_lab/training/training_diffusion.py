@@ -43,12 +43,13 @@ def train(model, scheduler, loader, optimizer, train_cfg, device):
 		
 		for epoch in range(train_cfg.params.epochs):
 			model.train()
+			optimizer.zero_grad()
 			
 			start_time = time.time()
 			
 			running_loss = 0.0
 			progress_bar = tqdm(loader, desc=f"Epoch: {epoch + 1}/{train_cfg.params.epochs}", unit=" bch")
-			for batch in progress_bar:
+			for i, batch in enumerate(progress_bar):
 				batch = batch.to(device)
 				
 				timestep = torch.randint(1, train_cfg.params.timesteps, size=(batch.shape[0],), device=device)
@@ -57,17 +58,23 @@ def train(model, scheduler, loader, optimizer, train_cfg, device):
 				optimizer.zero_grad()
 				out = model(x_t, timestep)
 				loss = criterion(out, epsilon)
-				loss.backward()
-				optimizer.step()
-				
 				running_loss += loss.item()
+				# Normalize the loss for gradient accumulation
+				loss = loss / train_cfg.params.accum_steps
+				loss.backward()
+				# Update the network only every N steps
+				if (i + 1) % train_cfg.params.accum_steps == 0:
+					optimizer.step()
+					optimizer.zero_grad()
+				
 				progress_bar.set_postfix(loss=loss.item())
 			
-			avg_loss = running_loss / len(loader)
+			avg_loss = running_loss / len(loader.dataset)
 			elapsed = time.time() - start_time
 			it_per_sec = (len(loader.dataset) + 1) / elapsed
 			
-			mlflow.log_metric("epoch_loss", avg_loss, step=epoch)
+			mlflow.log_metric("epoch_loss", running_loss, step=epoch)
+			mlflow.log_metric("avg_loss", avg_loss, step=epoch)
 			mlflow.log_metric("it_per_sec", it_per_sec, step=epoch)
 			
 			if epoch % train_cfg.params.log_step == 0:
