@@ -32,7 +32,7 @@ class NoiseScheduler:
 		:return: Noised image tensors, shape: (b, c, h, w)
 		"""
 		
-		epsilon = torch.rand_like(x_0, device=self.device)
+		epsilon = torch.randn_like(x_0, device=self.device)
 		x_t = self.sqrt_alpha_bar[t][:, None, None, None] * x_0 + self.sqrt_one_minus_alpha_bar[t][:, None, None, None] * epsilon
 		
 		return x_t, epsilon
