@@ -1,0 +1,5 @@
+name: default
+params:
+  num_workers: 0
+  persistent_workers: false
+  pin_memory: false

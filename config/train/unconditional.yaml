@@ -1,12 +1,21 @@
 defaults:
   - optimizer: adam
+  - loader: default
 
 name: unconditional
 run_name: run-0
 params:
-  timesteps: 1000
+  timesteps: 1_000
   epochs: 1_000
-  bach_size: 1
-  device: cpu
+  bach_size: 16
+  accum_steps: 1
+  device: mps
+  # Dataset & Dataloader
   dataset: ${hydra:runtime.cwd}/data/diffusion_training.csv
-  model_path: model.pth
+  # Additional info, model saving/loading
+  save_path: ${hydra:runtime.output_dir}/steps
+  model_name: uncond_unet
+  load_path: outputs/steps
+  load_timestep: 0
+  log_step: 50
+  save_step: 100

@@ -6,14 +6,20 @@ class NoiseScheduler:
 	"""
 	Base class for noise scheduler. Implementing the methods for a forward noising process.
 	"""
-	def __init__(self, n_timesteps=1000):
+	def __init__(self, n_timesteps=1000, device="cpu"):
+		"""
+		todo: description
+		:param n_timesteps: 
+		:param device: Device on which to generate the noise: "cpu"
+		"""
 		self.T = n_timesteps
+		self.device = device
 		
 		# to be overwritten by children
-		self.sqrt_alpha_bar = torch.zeros(n_timesteps)
-		self.sqrt_one_minus_alpha_bar = torch.zeros(n_timesteps)
+		self.sqrt_alpha_bar = torch.zeros(n_timesteps, device=self.device)
+		self.sqrt_one_minus_alpha_bar = torch.zeros(n_timesteps, device=self.device)
 	
-	def q_forward(self, x_0, t, device='cpu'):
+	def q_forward(self, x_0, t):
 		"""
 		Forward diffusion process, adding Gaussian noise to the image :math:`x_0`.
 
@@ -23,11 +29,10 @@ class NoiseScheduler:
 
 		:param x_0: Batch of image tensors, shape: (b, c, h, w)
 		:param t: Batch of time steps, for the diffusion process, shape: (b, 1)
-		:param device: Device on which to generate the noise: "cpu"
 		:return: Noised image tensors, shape: (b, c, h, w)
 		"""
 		
-		epsilon = torch.rand_like(x_0, device=device)
+		epsilon = torch.rand_like(x_0, device=self.device)
 		x_t = self.sqrt_alpha_bar[t][:, None, None, None] * x_0 + self.sqrt_one_minus_alpha_bar[t][:, None, None, None] * epsilon
 		
 		return x_t, epsilon
@@ -38,9 +43,9 @@ class CosineNoiseScheduler(NoiseScheduler):
 	Scheduler for cosine schedule proposed in "Improved Denoising Diffusion Probabilistic Models".
 	Cosine schedule adds less noise at the initial and final timestamps, while staying linear in the middle.
 	"""
-	def __init__(self, n_timesteps=1000, s=0.008):
-		super().__init__(n_timesteps)
-		x = torch.linspace(0, n_timesteps, n_timesteps + 1)
+	def __init__(self, n_timesteps=1000, s=0.008, device="cpu"):
+		super().__init__(n_timesteps, device)
+		x = torch.linspace(0, n_timesteps, n_timesteps + 1, device=device)
 		
 		# Calculate alpha_bar according to the formula
 		alphas_bar = torch.cos(((x / n_timesteps) + s) / (1 + s) * np.pi * 0.5) ** 2
@@ -61,8 +66,8 @@ class LinearNoiseScheduler(NoiseScheduler):
 	"""
 	Scheduler for a linear beta schedule. Beta increases linearly from beta_start to beta_end.
 	"""
-	def __init__(self, n_timesteps=1000, beta_start=0.001, beta_end=0.02):
-		super().__init__(n_timesteps)
+	def __init__(self, n_timesteps=1000, beta_start=0.001, beta_end=0.02, device="cpu"):
+		super().__init__(n_timesteps, device)
 
 		# Linearly spaced beta values
 		self.betas = torch.linspace(beta_start, beta_end, n_timesteps)
@@ -77,11 +82,11 @@ class LinearNoiseScheduler(NoiseScheduler):
 		self.sqrt_recip_alphas = torch.sqrt(1.0 / self.alphas)
 		self.posterior_variance = (self.betas * (1.0 - torch.cat([torch.tensor([1.0]), self.alpha_bars[:-1]])) / (1.0 - self.alpha_bars))
 
-	def q_forward(self, x_0, t, device='cpu'):
+	def q_forward(self, x_0, t):
 		"""
         Overrides base method: forward diffusion process that adds Gaussian noise to the input image x_0.
         """
-		noise = torch.randn_like(x_0, device=device)
+		noise = torch.randn_like(x_0, device=self.device)
 		# Compute square root of alpha bar at given timestep
 		sqrt_alpha_bar_t = self.sqrt_alpha_bar[t].view(-1, 1, 1, 1)
 		# Compute square root of alpha bar -1 at given timestep

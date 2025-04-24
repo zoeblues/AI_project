@@ -1,4 +1,4 @@
 name: adam
 type: torch.optim.Adam
 params:
-  lr: 1e-3  # learning rate
+  lr: 1e-4  # learning rate
