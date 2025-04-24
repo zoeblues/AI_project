@@ -8,9 +8,6 @@ import torch.nn as nn
 import yaml
 
 # Load the config for unet
-# todo change this into hydra format config
-# with open("../../config/model/unet.yaml", "r") as f:
-# 	config = yaml.safe_load(f)["params"]
 
 
 class UNet(nn.Module):
@@ -55,7 +52,7 @@ class UNet(nn.Module):
 			ConvUpBlock(128, 64, 2, 256, 32)
 		])
 		
-		# Final image output, that maps the last processed tensor back to desired num of channels
+		# Final image output, maps the last processed tensor back to desired num of channels
 		self.output_conv = nn.Sequential(
 			nn.GroupNorm(num_channels=64, num_groups=32),
 			nn.SiLU(),
