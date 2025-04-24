@@ -1,11 +1,11 @@
 name: unet
 type: diffusion_lab.models.diffusion.UNet
 params:
-  base_channels: 128
+  base_channels: 64
   image_size: 128
-  input_channels: 3
+  in_channels: 3
   num_groups: 32
   time_embedding_factor: 4
   attention_heads: 4
   output_channels: 3
-  num_layers: 4
+  num_layers: 2

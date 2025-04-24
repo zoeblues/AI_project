@@ -6,6 +6,7 @@ import torch.nn as nn
 #todo: sampling process
 #todo: model hyperparameters
 #todo: config !!!
+#todo: ddpm noise schedu;er
 
 '''
 Sampling process:
