@@ -11,7 +11,7 @@ from omegaconf import DictConfig
 
 
 class UNet(nn.Module):
-	def __init__(self, cfg: DictConfig):
+	def __init__(self, cfg: DictConfig, device='cpu'):
 		super().__init__()
 		self.cfg=cfg
 		
@@ -19,7 +19,6 @@ class UNet(nn.Module):
 		base_channels = cfg.base_channels
 		in_channels = cfg.in_channels
 		out_channels = cfg.out_channels
-		output_channels = cfg.output_channels
 		num_att_heads = cfg.attention_heads
 		num_groups = cfg.num_groups
 		num_layers = cfg.num_layers
@@ -36,7 +35,7 @@ class UNet(nn.Module):
 		
 		# Embed a time value into a feature vector
 		self.positional_encoding = nn.Sequential(
-			TransformerPositionEmbedding(dimension=base_channels),
+			TransformerPositionEmbedding(dimension=base_channels, device=device),
 			nn.Linear(base_channels, 4*base_channels),
 			nn.GELU(),
 			nn.Linear(4*base_channels, 4*base_channels)
@@ -67,7 +66,7 @@ class UNet(nn.Module):
 		self.output_conv = nn.Sequential(
 			nn.GroupNorm(num_channels=base_channels, num_groups=num_groups),
 			nn.SiLU(),
-			nn.Conv2d(base_channels, output_channels, kernel_size=3, padding=1)
+			nn.Conv2d(base_channels, out_channels, kernel_size=3, padding=1)
 		)
 	
 	def forward(self, input_tensor, time):
