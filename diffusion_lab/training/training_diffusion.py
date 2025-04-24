@@ -14,6 +14,7 @@ import logging
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torchvision import transforms
 
 from diffusion_lab.datasets.dataset_diffusion import DiffusionDataset
 
@@ -81,14 +82,26 @@ def train(model, scheduler, loader, optimizer, train_cfg, device):
 def main(cfg: DictConfig):
 	mlflow.set_experiment(cfg.project.name)
 	
-	dataset = DiffusionDataset(dataset_path=cfg.train.params.dataset)
+	train_transform = transforms.Compose([
+		transforms.Resize(128),  # todo: config
+		transforms.RandomResizedCrop((128, 128), scale=(0.8, 1.0), ratio=(0.8, 1.2)),
+		transforms.RandomHorizontalFlip(p=0.5),
+		transforms.ToTensor(),  # Convert image to tensor
+		transforms.Normalize(  # Normalize RGB pixel values: [0, 255] -> [-1, 1]
+			mean=[0.5, 0.5, 0.5],
+			std=[0.5, 0.5, 0.5]
+		)
+	])
+	
+	dataset = DiffusionDataset(dataset_path=cfg.train.params.dataset, transform=train_transform)
 	loader = DataLoader(dataset, batch_size=cfg.train.params.bach_size, shuffle=True, **cfg.train.loader.params)
 	
 	# Loading model dynamically, based on config.
 	model_path, model_name = cfg.model.type.rsplit(".", maxsplit=1)  # get module path, and class name
 	model_cls = getattr(importlib.import_module(model_path), model_name)  # dynamic load a given class from a library
 	model = model_cls(**cfg.model.params, device=cfg.train.params.device)  # create an instance, with params from config
-	if 'load_path' in cfg.train.params and 'load_timestep' in cfg.train.params and cfg.train.params.load_timestep != 0:
+	# Loading already trained model weights, if specified in the config (load_timestep != 0)
+	if cfg.train.params.load_timestep != 0 and 'load_path' in cfg.train.params and 'load_timestep' in cfg.train.params:
 		model.load_state_dict(torch.load(pjoin(cfg.train.params.load_path, f"{cfg.train.params.load_timestep}.pth")))
 	
 	# make sure the folder for train steps exists, create if it doesn't.
