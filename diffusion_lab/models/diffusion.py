@@ -5,25 +5,30 @@ from diffusion_lab.models.layers import ConvDownBlock, AttentionDownBlock, Atten
 	ResNetBlock
 import torch
 import torch.nn as nn
-import yaml
+from omegaconf import DictConfig
 
 # Load the config for unet
-# todo change this into hydra format config
-# with open("../../config/model/unet.yaml", "r") as f:
-# 	config = yaml.safe_load(f)["params"]
 
 
 class UNet(nn.Module):
-	def __init__(self, device='cpu', **kwargs):
+	def __init__(self, cfg: DictConfig):
 		super().__init__()
+		self.cfg=cfg
 		
-		# Remember the target device
-		self.device = device
+		# Load parameters from config
+		base_channels = cfg.base_channels
+		in_channels = cfg.in_channels
+		out_channels = cfg.out_channels
+		output_channels = cfg.output_channels
+		num_att_heads = cfg.attention_heads
+		num_groups = cfg.num_groups
+		num_layers = cfg.num_layers
+		time_emb_channels = base_channels * cfg.time_embedding_factor
 		
 		# Convert image into a base feature map
 		self.initial_conv = nn.Conv2d(
-			in_channels=3,
-			out_channels=64,
+			in_channels=in_channels, #3
+			out_channels=out_channels, #64
 			kernel_size=3,
 			stride=1,
 			padding=1
@@ -31,38 +36,38 @@ class UNet(nn.Module):
 		
 		# Embed a time value into a feature vector
 		self.positional_encoding = nn.Sequential(
-			TransformerPositionEmbedding(dimension=64, device=self.device),
-			nn.Linear(64, 256),
+			TransformerPositionEmbedding(dimension=base_channels),
+			nn.Linear(base_channels, 4*base_channels),
 			nn.GELU(),
-			nn.Linear(256, 256)
+			nn.Linear(4*base_channels, 4*base_channels)
 		)
 		
 		# Reduce the spatial size (height/width) of the image
 		# Increase the number of feature channels
 		self.downsample_blocks = nn.ModuleList([
-			ConvDownBlock(64, 64, 2, 256, 32),
-			ConvDownBlock(64, 64, 2, 256, 32),
-			ConvDownBlock(64, 128, 2, 256, 32),
-			AttentionDownBlock(128, 128, 2, 256, 32, 4),
-			ConvDownBlock(128, 256, 2, 256, 32)
+			ConvDownBlock(base_channels, base_channels,  num_layers, time_emb_channels, num_groups),
+			ConvDownBlock(base_channels, base_channels,  num_layers, time_emb_channels, num_groups),
+			ConvDownBlock(base_channels, base_channels*2,  num_layers, time_emb_channels, num_groups),
+			AttentionDownBlock(base_channels*2, base_channels*2,  num_layers, time_emb_channels, num_groups, num_att_heads),
+			ConvDownBlock(base_channels*2, base_channels*4,  num_layers, time_emb_channels, num_groups)
 		])
 		
-		self.bottleneck = AttentionDownBlock(256, 256, 2, 256, 32, 4, downsample=False)
+		self.bottleneck = AttentionDownBlock(base_channels*4, base_channels*4, num_layers, time_emb_channels, num_groups, num_att_heads, downsample=False)
 		
 		# Upscale the features and merge them with the corresponding features from downsampling path
 		self.upsample_blocks = nn.ModuleList([
-			ConvUpBlock(512, 256, 2, 256, 32),
-			AttentionUpBlock(256 + 128, 128, 2, 256, 32, 4),
-			ConvUpBlock(256, 128, 2, 256, 32),
-			ConvUpBlock(128 + 64, 64, 2, 256, 32),
-			ConvUpBlock(128, 64, 2, 256, 32)
+			ConvUpBlock(base_channels*8, base_channels*4, num_layers, time_emb_channels, num_groups),
+			AttentionUpBlock(base_channels*4 + base_channels*2, base_channels*2, num_layers, time_emb_channels, num_groups, num_att_heads),
+			ConvUpBlock(base_channels*4, base_channels*2, num_layers, time_emb_channels, num_groups),
+			ConvUpBlock(base_channels*2 + base_channels, base_channels, num_layers, time_emb_channels, num_groups),
+			ConvUpBlock(base_channels*2, base_channels, num_layers, time_emb_channels, num_groups)
 		])
 		
-		# Final image output, that maps the last processed tensor back to desired num of channels
+		# Final image output, maps the last processed tensor back to desired num of channels
 		self.output_conv = nn.Sequential(
-			nn.GroupNorm(num_channels=64, num_groups=32),
+			nn.GroupNorm(num_channels=base_channels, num_groups=num_groups),
 			nn.SiLU(),
-			nn.Conv2d(64, 3, 3, padding=1)
+			nn.Conv2d(base_channels, output_channels, kernel_size=3, padding=1)
 		)
 	
 	def forward(self, input_tensor, time):
@@ -90,43 +95,3 @@ class UNet(nn.Module):
 			x = block(x, time_encoded)
 		
 		return self.output_conv(x)
-
-
-if __name__ == '__main__':
-	# Please run with working dir as the main project dir
-	import os
-	from PIL import Image
-	from torchvision import transforms
-	
-	def load_image(image_path, size=(128, 128)):
-		image = Image.open(image_path).convert("RGB")
-		transform = transforms.Compose([
-			transforms.Resize(size),
-			transforms.ToTensor(),
-		])
-		return transform(image).unsqueeze(0)  # batch dimension
-	
-	
-	# Initialize the model
-	model = UNet()
-	
-	# Choose input: either dummy tensor or real image
-	use_image = True
-	image_path = "data/resized_images/Cat/cat-test_(1).jpeg"  # Set your image path here
-	
-	if use_image and os.path.exists(image_path):
-		image = load_image(image_path)  # Shape: (1, 3, H, W)
-		print(f"Loaded image from {image_path} with shape {image.shape}")
-	else:
-		image = torch.randn(1, 3, 128, 128)  # Dummy input
-		print("Using dummy image.")
-	
-	# Timestep tensor
-	time = torch.tensor([250], dtype=torch.long)
-	
-	# Run the model
-	model.eval()
-	with torch.no_grad():
-		output = model(image, time)
-	
-	print(f"Output shape: {output.shape}")
