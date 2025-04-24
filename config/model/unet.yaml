@@ -7,5 +7,4 @@ params:
   num_groups: 32
   time_embedding_factor: 4
   attention_heads: 4
-  out_channels: 3
   num_layers: 2

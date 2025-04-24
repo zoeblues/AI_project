@@ -18,7 +18,6 @@ class UNet(nn.Module):
 		# Load parameters from config
 		base_channels = cfg.base_channels
 		in_channels = cfg.in_channels
-		out_channels = cfg.out_channels
 		num_att_heads = cfg.attention_heads
 		num_groups = cfg.num_groups
 		num_layers = cfg.num_layers
@@ -27,7 +26,7 @@ class UNet(nn.Module):
 		# Convert image into a base feature map
 		self.initial_conv = nn.Conv2d(
 			in_channels=in_channels, #3
-			out_channels=out_channels, #64
+			out_channels=base_channels, #64
 			kernel_size=3,
 			stride=1,
 			padding=1
@@ -66,7 +65,7 @@ class UNet(nn.Module):
 		self.output_conv = nn.Sequential(
 			nn.GroupNorm(num_channels=base_channels, num_groups=num_groups),
 			nn.SiLU(),
-			nn.Conv2d(base_channels, out_channels, kernel_size=3, padding=1)
+			nn.Conv2d(base_channels, in_channels, kernel_size=3, padding=1)
 		)
 	
 	def forward(self, input_tensor, time):
@@ -94,3 +93,54 @@ class UNet(nn.Module):
 			x = block(x, time_encoded)
 		
 		return self.output_conv(x)
+
+
+if __name__ == '__main__':
+	# Please run with working dir as the main project dir
+	import os
+	from PIL import Image
+	from torchvision import transforms
+	
+	
+	def load_image(image_path, size=(128, 128)):
+		image = Image.open(image_path).convert("RGB")
+		transform = transforms.Compose([
+			transforms.Resize(size),
+			transforms.ToTensor(),
+		])
+		return transform(image).unsqueeze(0)  # batch dimension
+	
+	cfg = DictConfig({
+		'base_channels': 64,
+		'image_size': 128,
+		'in_channels': 3,
+		'num_groups': 32,
+		'time_embedding_factor': 4,
+		'attention_heads': 4,
+		'out_channels': 3,
+		'num_layers': 2
+	})
+	
+	# Initialize the model
+	model = UNet(cfg, device='cpu')
+	
+	# Choose input: either dummy tensor or real image
+	use_image = True
+	image_path = "data/resized_images/Cat/cat-test_(1).jpeg"  # Set your image path here
+	
+	if use_image and os.path.exists(image_path):
+		image = load_image(image_path)  # Shape: (1, 3, H, W)
+		print(f"Loaded image from {image_path} with shape {image.shape}")
+	else:
+		image = torch.randn(1, 3, 128, 128)  # Dummy input
+		print("Using dummy image.")
+	
+	# Timestep tensor
+	time = torch.tensor([250], dtype=torch.long)
+	
+	# Run the model
+	model.eval()
+	with torch.no_grad():
+		output = model(image, time)
+	
+	print(f"Output shape: {output.shape}")
