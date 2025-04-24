@@ -37,9 +37,8 @@ def train(model, scheduler, loader, optimizer, train_cfg, device):
 			model.train()
 			optimizer.zero_grad()
 			
-			start_time = time.time()
-			
 			running_loss = 0.0
+			start_time = time.time()
 			progress_bar = tqdm(loader, desc=f"Epoch: {epoch + 1}/{train_cfg.params.epochs}", unit=" bch")
 			for i, batch in enumerate(progress_bar):
 				batch = batch.to(device)
@@ -65,15 +64,14 @@ def train(model, scheduler, loader, optimizer, train_cfg, device):
 			elapsed = time.time() - start_time
 			it_per_sec = (len(loader.dataset) + 1) / elapsed
 			
-			mlflow.log_metric("epoch_loss", running_loss, step=epoch)
 			mlflow.log_metric("avg_loss", avg_loss, step=epoch)
 			mlflow.log_metric("items_per_sec", it_per_sec, step=epoch)
 			mlflow.log_metric("elapsed", elapsed, step=epoch)
 			
-			if epoch % train_cfg.params.log_step == 0:
+			if (epoch + 1) % train_cfg.params.log_step == 0:
 				log.info(f"Epoch {epoch + 1}/{train_cfg.params.epochs} Loss: {avg_loss}")
-			if epoch % train_cfg.params.save_step == 0 and epoch != 0:
-				torch.save(model.state_dict(), pjoin(train_cfg.params.save_path, f"step-{epoch}.pth"))
+			if (epoch + 1) % train_cfg.params.save_step == 0 and epoch != 0:
+				torch.save(model.state_dict(), pjoin(train_cfg.params.save_path, f"step-{epoch + 1}.pth"))
 	
 	# Save model
 	torch.save(model.state_dict(), pjoin(train_cfg.params.save_path, f"{train_cfg.params.model_name}.pth"))
@@ -84,8 +82,8 @@ def main(cfg: DictConfig):
 	mlflow.set_experiment(cfg.project.name)
 	
 	train_transform = transforms.Compose([
-		transforms.Resize(128),  # todo: config
-		transforms.RandomResizedCrop((128, 128), scale=(0.8, 1.0), ratio=(0.8, 1.2)),
+		transforms.Resize(64),  # todo: config
+		transforms.RandomResizedCrop((64, 64), scale=(0.8, 1.0), ratio=(0.8, 1.2)),
 		transforms.RandomHorizontalFlip(p=0.5),
 		transforms.ToTensor(),  # Convert image to tensor
 		transforms.Normalize(  # Normalize RGB pixel values: [0, 255] -> [-1, 1]
