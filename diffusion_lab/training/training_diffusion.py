@@ -67,7 +67,8 @@ def train(model, scheduler, loader, optimizer, train_cfg, device):
 			
 			mlflow.log_metric("epoch_loss", running_loss, step=epoch)
 			mlflow.log_metric("avg_loss", avg_loss, step=epoch)
-			mlflow.log_metric("it_per_sec", it_per_sec, step=epoch)
+			mlflow.log_metric("items_per_sec", it_per_sec, step=epoch)
+			mlflow.log_metric("elapsed", elapsed, step=epoch)
 			
 			if epoch % train_cfg.params.log_step == 0:
 				log.info(f"Epoch {epoch + 1}/{train_cfg.params.epochs} Loss: {avg_loss}")

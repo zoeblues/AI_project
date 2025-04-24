@@ -9,7 +9,7 @@ params:
   epochs: 1_000
   bach_size: 16
   accum_steps: 1
-  device: mps
+  device: cpu
   # Dataset & Dataloader
   dataset: ${hydra:runtime.cwd}/data/diffusion_training.csv
   # Additional info, model saving/loading
