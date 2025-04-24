@@ -5,7 +5,6 @@ from diffusion_lab.models.layers import ConvDownBlock, AttentionDownBlock, Atten
 	ResNetBlock
 import torch
 import torch.nn as nn
-import yaml
 
 # Load the config for unet
 
