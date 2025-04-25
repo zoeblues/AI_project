@@ -1,11 +1,13 @@
 """
 File taken from: https://github.com/mattroz/diffusion-ddpm/tree/main
 """
-from diffusion_lab.models.layers import ConvDownBlock, AttentionDownBlock, AttentionUpBlock, TransformerPositionEmbedding, ConvUpBlock, \
+from diffusion_lab.models.layers import ConvDownBlock, AttentionDownBlock, AttentionUpBlock, \
+	TransformerPositionEmbedding, ConvUpBlock, \
 	ResNetBlock
 import torch
 import torch.nn as nn
 from omegaconf import DictConfig
+
 
 # Load the config for unet
 
@@ -13,7 +15,8 @@ from omegaconf import DictConfig
 class UNet(nn.Module):
 	def __init__(self, cfg: DictConfig, device='cpu'):
 		super().__init__()
-		self.cfg=cfg
+		self.cfg = cfg
+		self.device = device
 		
 		# Load parameters from config
 		base_channels = cfg.base_channels
@@ -25,8 +28,8 @@ class UNet(nn.Module):
 		
 		# Convert image into a base feature map
 		self.initial_conv = nn.Conv2d(
-			in_channels=in_channels, #3
-			out_channels=base_channels, #64
+			in_channels=in_channels,  # 3
+			out_channels=base_channels,  # 64
 			kernel_size=3,
 			stride=1,
 			padding=1
@@ -35,30 +38,33 @@ class UNet(nn.Module):
 		# Embed a time value into a feature vector
 		self.positional_encoding = nn.Sequential(
 			TransformerPositionEmbedding(dimension=base_channels, device=device),
-			nn.Linear(base_channels, 4*base_channels),
+			nn.Linear(base_channels, 4 * base_channels),
 			nn.GELU(),
-			nn.Linear(4*base_channels, 4*base_channels)
+			nn.Linear(4 * base_channels, 4 * base_channels)
 		)
 		
 		# Reduce the spatial size (height/width) of the image
 		# Increase the number of feature channels
 		self.downsample_blocks = nn.ModuleList([
-			ConvDownBlock(base_channels, base_channels,  num_layers, time_emb_channels, num_groups),
-			ConvDownBlock(base_channels, base_channels,  num_layers, time_emb_channels, num_groups),
-			ConvDownBlock(base_channels, base_channels*2,  num_layers, time_emb_channels, num_groups),
-			AttentionDownBlock(base_channels*2, base_channels*2,  num_layers, time_emb_channels, num_groups, num_att_heads),
-			ConvDownBlock(base_channels*2, base_channels*4,  num_layers, time_emb_channels, num_groups)
+			ConvDownBlock(base_channels, base_channels, num_layers, time_emb_channels, num_groups),
+			ConvDownBlock(base_channels, base_channels, num_layers, time_emb_channels, num_groups),
+			ConvDownBlock(base_channels, base_channels * 2, num_layers, time_emb_channels, num_groups),
+			AttentionDownBlock(base_channels * 2, base_channels * 2, num_layers, time_emb_channels, num_groups,
+			                   num_att_heads),
+			ConvDownBlock(base_channels * 2, base_channels * 4, num_layers, time_emb_channels, num_groups)
 		])
 		
-		self.bottleneck = AttentionDownBlock(base_channels*4, base_channels*4, num_layers, time_emb_channels, num_groups, num_att_heads, downsample=False)
+		self.bottleneck = AttentionDownBlock(base_channels * 4, base_channels * 4, num_layers, time_emb_channels,
+		                                     num_groups, num_att_heads, downsample=False)
 		
 		# Upscale the features and merge them with the corresponding features from downsampling path
 		self.upsample_blocks = nn.ModuleList([
-			ConvUpBlock(base_channels*8, base_channels*4, num_layers, time_emb_channels, num_groups),
-			AttentionUpBlock(base_channels*4 + base_channels*2, base_channels*2, num_layers, time_emb_channels, num_groups, num_att_heads),
-			ConvUpBlock(base_channels*4, base_channels*2, num_layers, time_emb_channels, num_groups),
-			ConvUpBlock(base_channels*2 + base_channels, base_channels, num_layers, time_emb_channels, num_groups),
-			ConvUpBlock(base_channels*2, base_channels, num_layers, time_emb_channels, num_groups)
+			ConvUpBlock(base_channels * 8, base_channels * 4, num_layers, time_emb_channels, num_groups),
+			AttentionUpBlock(base_channels * 4 + base_channels * 2, base_channels * 2, num_layers, time_emb_channels,
+			                 num_groups, num_att_heads),
+			ConvUpBlock(base_channels * 4, base_channels * 2, num_layers, time_emb_channels, num_groups),
+			ConvUpBlock(base_channels * 2 + base_channels, base_channels, num_layers, time_emb_channels, num_groups),
+			ConvUpBlock(base_channels * 2, base_channels, num_layers, time_emb_channels, num_groups)
 		])
 		
 		# Final image output, maps the last processed tensor back to desired num of channels
@@ -109,6 +115,7 @@ if __name__ == '__main__':
 			transforms.ToTensor(),
 		])
 		return transform(image).unsqueeze(0)  # batch dimension
+	
 	
 	cfg = DictConfig({
 		'base_channels': 64,
