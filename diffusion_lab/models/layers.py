@@ -318,6 +318,12 @@ class AttentionUpBlock(nn.Module):
 		return x
 
 
+
+"""
+We use RESNET as having many layers results in vanishing gradients problem.
+Here we implement skip connections that bypass some levels in between to link layers in unet.
+This creates a leftover blocks that are stacked and called resnets.
+"""
 class ResNetBlock(nn.Module):
 	"""
 	In the original DDPM paper Wide ResNet was used
@@ -332,20 +338,30 @@ class ResNetBlock(nn.Module):
 			else None
 		)
 		
+		# Perform two convolutions, for the layer before the attention we have diff num of channels,
+		# so we introduce additional conv
+	
 		self.block1 = ConvBlock(in_channels, out_channels, groups=num_groups)
 		self.block2 = ConvBlock(out_channels, out_channels, groups=num_groups)
 		self.residual_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
 	
 	def forward(self, x, time_embedding=None):
+		# x is a feautre map coming from the previous layer (4D tensor)
 		input_tensor = x
 		h = self.block1(x)
 		# According to authors implementations, they inject timestep embedding into the network
 		# using MLP after the first conv block in all the ResNet blocks
 		# (https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0706c543/diffusion_tf/models/unet.py#L49)
 		
+		# our forward layer is dependent on the time factor as it changes within time
+		# h is a hidden representation after applying the first convolution block
+		# time_emb is a small MLP that maps the time embedding vector to a shape compatible with out tensor
+		
 		time_emb = self.time_embedding_projectile(time_embedding)
 		time_emb = time_emb[:, :, None, None]
+		# our features are time conditioned
 		x = time_emb + h
 		
 		x = self.block2(x)
+		# return final output with residual connection
 		return x + self.residual_conv(input_tensor)

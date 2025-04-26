@@ -1,29 +1,35 @@
 """
 File taken from: https://github.com/mattroz/diffusion-ddpm/tree/main
 """
-from diffusion_lab.models.layers import ConvDownBlock, AttentionDownBlock, AttentionUpBlock, TransformerPositionEmbedding, ConvUpBlock, \
+from diffusion_lab.models.layers import ConvDownBlock, AttentionDownBlock, AttentionUpBlock, \
+	TransformerPositionEmbedding, ConvUpBlock, \
 	ResNetBlock
 import torch
 import torch.nn as nn
-import yaml
+from omegaconf import DictConfig
+
 
 # Load the config for unet
-# todo change this into hydra format config
-# with open("../../config/model/unet.yaml", "r") as f:
-# 	config = yaml.safe_load(f)["params"]
 
 
 class UNet(nn.Module):
-	def __init__(self, device='cpu', **kwargs):
+	def __init__(self, cfg: DictConfig, device='cpu'):
 		super().__init__()
-		
-		# Remember the target device
+		self.cfg = cfg
 		self.device = device
+		
+		# Load parameters from config
+		base_channels = cfg.base_channels
+		in_channels = cfg.in_channels
+		num_att_heads = cfg.attention_heads
+		num_groups = cfg.num_groups
+		num_layers = cfg.num_layers
+		time_emb_channels = base_channels * cfg.time_embedding_factor
 		
 		# Convert image into a base feature map
 		self.initial_conv = nn.Conv2d(
-			in_channels=3,
-			out_channels=64,
+			in_channels=in_channels,  # 3
+			out_channels=base_channels,  # 64
 			kernel_size=3,
 			stride=1,
 			padding=1
@@ -31,38 +37,38 @@ class UNet(nn.Module):
 		
 		# Embed a time value into a feature vector
 		self.positional_encoding = nn.Sequential(
-			TransformerPositionEmbedding(dimension=64, device=self.device),
-			nn.Linear(64, 256),
+			TransformerPositionEmbedding(dimension=base_channels, device=device),
+			nn.Linear(base_channels, 4 * base_channels),
 			nn.GELU(),
-			nn.Linear(256, 256)
+			nn.Linear(4 * base_channels, 4 * base_channels)
 		)
 		
 		# Reduce the spatial size (height/width) of the image
 		# Increase the number of feature channels
 		self.downsample_blocks = nn.ModuleList([
-			ConvDownBlock(64, 64, 2, 256, 32),
-			ConvDownBlock(64, 64, 2, 256, 32),
-			ConvDownBlock(64, 128, 2, 256, 32),
-			AttentionDownBlock(128, 128, 2, 256, 32, 4),
-			ConvDownBlock(128, 256, 2, 256, 32)
+			ConvDownBlock(base_channels, base_channels, num_layers, time_emb_channels, num_groups),
+			ConvDownBlock(base_channels, base_channels, num_layers, time_emb_channels, num_groups),
+			ConvDownBlock(base_channels, base_channels * 2, num_layers, time_emb_channels, num_groups),
+			AttentionDownBlock(base_channels * 2, base_channels * 2, num_layers, time_emb_channels, num_groups, num_att_heads),
+			ConvDownBlock(base_channels * 2, base_channels * 4, num_layers, time_emb_channels, num_groups)
 		])
 		
-		self.bottleneck = AttentionDownBlock(256, 256, 2, 256, 32, 4, downsample=False)
+		self.bottleneck = AttentionDownBlock(base_channels * 4, base_channels * 4, num_layers, time_emb_channels, num_groups, num_att_heads, downsample=False)
 		
 		# Upscale the features and merge them with the corresponding features from downsampling path
 		self.upsample_blocks = nn.ModuleList([
-			ConvUpBlock(512, 256, 2, 256, 32),
-			AttentionUpBlock(256 + 128, 128, 2, 256, 32, 4),
-			ConvUpBlock(256, 128, 2, 256, 32),
-			ConvUpBlock(128 + 64, 64, 2, 256, 32),
-			ConvUpBlock(128, 64, 2, 256, 32)
+			ConvUpBlock(base_channels * 8, base_channels * 4, num_layers, time_emb_channels, num_groups),
+			AttentionUpBlock(base_channels * 4 + base_channels * 2, base_channels * 2, num_layers, time_emb_channels, num_groups, num_att_heads),
+			ConvUpBlock(base_channels * 4, base_channels * 2, num_layers, time_emb_channels, num_groups),
+			ConvUpBlock(base_channels * 2 + base_channels, base_channels, num_layers, time_emb_channels, num_groups),
+			ConvUpBlock(base_channels * 2, base_channels, num_layers, time_emb_channels, num_groups)
 		])
 		
-		# Final image output, that maps the last processed tensor back to desired num of channels
+		# Final image output, maps the last processed tensor back to desired num of channels
 		self.output_conv = nn.Sequential(
-			nn.GroupNorm(num_channels=64, num_groups=32),
+			nn.GroupNorm(num_channels=base_channels, num_groups=num_groups),
 			nn.SiLU(),
-			nn.Conv2d(64, 3, 3, padding=1)
+			nn.Conv2d(base_channels, in_channels, kernel_size=3, padding=1)
 		)
 	
 	def forward(self, input_tensor, time):
@@ -98,6 +104,7 @@ if __name__ == '__main__':
 	from PIL import Image
 	from torchvision import transforms
 	
+	
 	def load_image(image_path, size=(128, 128)):
 		image = Image.open(image_path).convert("RGB")
 		transform = transforms.Compose([
@@ -107,8 +114,19 @@ if __name__ == '__main__':
 		return transform(image).unsqueeze(0)  # batch dimension
 	
 	
+	cfg = DictConfig({
+		'base_channels': 64,
+		'image_size': 128,
+		'in_channels': 3,
+		'num_groups': 32,
+		'time_embedding_factor': 4,
+		'attention_heads': 4,
+		'out_channels': 3,
+		'num_layers': 2
+	})
+	
 	# Initialize the model
-	model = UNet()
+	model = UNet(cfg, device='cpu')
 	
 	# Choose input: either dummy tensor or real image
 	use_image = True

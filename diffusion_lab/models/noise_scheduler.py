@@ -8,7 +8,6 @@ class NoiseScheduler:
 	"""
 	def __init__(self, n_timesteps=1000, device="cpu"):
 		"""
-		todo: description
 		:param n_timesteps: 
 		:param device: Device on which to generate the noise: "cpu"
 		"""
@@ -16,8 +15,11 @@ class NoiseScheduler:
 		self.device = device
 		
 		# to be overwritten by children
+		self.sigma = torch.zeros(n_timesteps, device=self.device)
+		self.one_over_sqrt_alpha = torch.zeros(n_timesteps, device=self.device)
 		self.sqrt_alpha_bar = torch.zeros(n_timesteps, device=self.device)
 		self.sqrt_one_minus_alpha_bar = torch.zeros(n_timesteps, device=self.device)
+		self.one_m_alpha_over_sqrt_one_m_alpha_bar = torch.zeros(n_timesteps, device=self.device)
 	
 	def q_forward(self, x_0, t):
 		"""
@@ -32,10 +34,17 @@ class NoiseScheduler:
 		:return: Noised image tensors, shape: (b, c, h, w)
 		"""
 		
-		epsilon = torch.rand_like(x_0, device=self.device)
+		epsilon = torch.randn_like(x_0, device=self.device)
 		x_t = self.sqrt_alpha_bar[t][:, None, None, None] * x_0 + self.sqrt_one_minus_alpha_bar[t][:, None, None, None] * epsilon
 		
 		return x_t, epsilon
+	
+	def p_backward(self, x_t, epsilon_t, t):
+		z = torch.randn_like(x_t, device=self.device) if t > 1 else torch.zeros_like(x_t, device=self.device)
+		x_t_minus_noise = x_t - self.one_m_alpha_over_sqrt_one_m_alpha_bar[t][:, None, None, None] * epsilon_t
+		x_t_minus_one = self.one_over_sqrt_alpha[t][:, None, None, None] * x_t_minus_noise + self.sigma[t][:, None, None, None] * z
+		
+		return x_t_minus_one
 
 
 class CosineNoiseScheduler(NoiseScheduler):
@@ -57,9 +66,12 @@ class CosineNoiseScheduler(NoiseScheduler):
 		alphas = 1.0 - betas
 		alpha_bars = torch.cumprod(alphas, dim=0)
 		
-		# Final calculation of sqrt_alphas
+		# Final calculation to save
+		self.sigma = betas ** 0.5
+		self.one_over_sqrt_alpha = 1 / alphas ** 0.5
 		self.sqrt_alpha_bar = alpha_bars ** 0.5
 		self.sqrt_one_minus_alpha_bar = (1 - alpha_bars) ** 0.5
+		self.one_m_alpha_over_sqrt_one_m_alpha_bar = (1 - alphas) / self.sqrt_one_minus_alpha_bar
 
 
 class LinearNoiseScheduler(NoiseScheduler):

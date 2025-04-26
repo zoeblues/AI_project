@@ -14,19 +14,11 @@ import logging
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torchvision import transforms
 
 from diffusion_lab.datasets.dataset_diffusion import DiffusionDataset
 
 log = logging.getLogger(__name__)
-
-
-def get_grad_norm(model):
-	total_norm = 0.0
-	for p in model.parameters():
-		if p.grad is not None:
-			param_norm = p.grad.data.norm(2)
-			total_norm += param_norm.item() ** 2
-	return total_norm ** 0.5
 
 
 def train(model, scheduler, loader, optimizer, train_cfg, device):
@@ -43,12 +35,12 @@ def train(model, scheduler, loader, optimizer, train_cfg, device):
 		
 		for epoch in range(train_cfg.params.epochs):
 			model.train()
-			
-			start_time = time.time()
+			optimizer.zero_grad()
 			
 			running_loss = 0.0
+			start_time = time.time()
 			progress_bar = tqdm(loader, desc=f"Epoch: {epoch + 1}/{train_cfg.params.epochs}", unit=" bch")
-			for batch in progress_bar:
+			for i, batch in enumerate(progress_bar):
 				batch = batch.to(device)
 				
 				timestep = torch.randint(1, train_cfg.params.timesteps, size=(batch.shape[0],), device=device)
@@ -57,23 +49,29 @@ def train(model, scheduler, loader, optimizer, train_cfg, device):
 				optimizer.zero_grad()
 				out = model(x_t, timestep)
 				loss = criterion(out, epsilon)
-				loss.backward()
-				optimizer.step()
-				
 				running_loss += loss.item()
+				# Normalize the loss for gradient accumulation
+				loss = loss / train_cfg.params.accum_steps
+				loss.backward()
+				# Update the network only every N steps
+				if (i + 1) % train_cfg.params.accum_steps == 0:
+					optimizer.step()
+					optimizer.zero_grad()
+				
 				progress_bar.set_postfix(loss=loss.item())
 			
-			avg_loss = running_loss / len(loader)
+			avg_loss = running_loss / len(loader.dataset)
 			elapsed = time.time() - start_time
 			it_per_sec = (len(loader.dataset) + 1) / elapsed
-			
-			mlflow.log_metric("epoch_loss", avg_loss, step=epoch)
-			mlflow.log_metric("it_per_sec", it_per_sec, step=epoch)
-			
-			if epoch % train_cfg.params.log_step == 0:
+
+			mlflow.log_metric("avg_loss", avg_loss, step=epoch)
+			mlflow.log_metric("items_per_sec", it_per_sec, step=epoch)
+			mlflow.log_metric("elapsed", elapsed, step=epoch)
+
+			if (epoch + 1) % train_cfg.params.log_step == 0:
 				log.info(f"Epoch {epoch + 1}/{train_cfg.params.epochs} Loss: {avg_loss}")
-			if epoch % train_cfg.params.save_step == 0 and epoch != 0:
-				torch.save(model.state_dict(), pjoin(train_cfg.params.save_path, f"step-{epoch}.pth"))
+			if (epoch + 1) % train_cfg.params.save_step == 0 and epoch != 0:
+				torch.save(model.state_dict(), pjoin(train_cfg.params.save_path, f"step-{epoch + 1}.pth"))
 	
 	# Save model
 	torch.save(model.state_dict(), pjoin(train_cfg.params.save_path, f"{train_cfg.params.model_name}.pth"))
@@ -83,14 +81,26 @@ def train(model, scheduler, loader, optimizer, train_cfg, device):
 def main(cfg: DictConfig):
 	mlflow.set_experiment(cfg.project.name)
 	
-	dataset = DiffusionDataset(dataset_path=cfg.train.params.dataset)
+	train_transform = transforms.Compose([
+		transforms.Resize(64),  # todo: config
+		transforms.RandomResizedCrop((64, 64), scale=(0.8, 1.0), ratio=(0.8, 1.2)),
+		transforms.RandomHorizontalFlip(p=0.5),
+		transforms.ToTensor(),  # Convert image to tensor
+		transforms.Normalize(  # Normalize RGB pixel values: [0, 255] -> [-1, 1]
+			mean=[0.5, 0.5, 0.5],
+			std=[0.5, 0.5, 0.5]
+		)
+	])
+	
+	dataset = DiffusionDataset(dataset_path=cfg.train.params.dataset, transform=train_transform)
 	loader = DataLoader(dataset, batch_size=cfg.train.params.bach_size, shuffle=True, **cfg.train.loader.params)
 	
 	# Loading model dynamically, based on config.
 	model_path, model_name = cfg.model.type.rsplit(".", maxsplit=1)  # get module path, and class name
 	model_cls = getattr(importlib.import_module(model_path), model_name)  # dynamic load a given class from a library
-	model = model_cls(**cfg.model.params, device=cfg.train.params.device)  # create an instance, with params from config
-	if 'load_path' in cfg.train.params and 'load_timestep' in cfg.train.params and cfg.train.params.load_timestep != 0:
+	model = model_cls(cfg.model.params, device=cfg.train.params.device)  # create an instance, with params from config
+	# Loading already trained model weights, if specified in the config (load_timestep != 0)
+	if cfg.train.params.load_timestep != 0 and 'load_path' in cfg.train.params and 'load_timestep' in cfg.train.params:
 		model.load_state_dict(torch.load(pjoin(cfg.train.params.load_path, f"{cfg.train.params.load_timestep}.pth")))
 	
 	# make sure the folder for train steps exists, create if it doesn't.
