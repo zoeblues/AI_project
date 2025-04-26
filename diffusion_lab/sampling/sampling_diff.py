@@ -13,9 +13,6 @@ from diffusion_lab.models.noise_scheduler import LinearNoiseScheduler
 
 '''
 Sampling process = "Hey, if you saw this noisy image, how would you reverse it?"
-1. INITISLIZATION: sample random noise from Gaussian
-2. ITERATIVE REFINEMENT: refine through the learned reverse process
-3. COMPLETION: gradually remove noise and add structutre to sample
 
 based on 'Algorithm 2 Sampling' from DDPM paper
 xT~ N(0,I)
@@ -28,11 +25,13 @@ return x0
 @torch.no_grad()
 def sample_timestep(model, x, t, scheduler):
     """
-    Sample x_{t-1} from x_t at timestep t, using the given model and scheduler.
+    Denoises the image at a single step. It takes the noisy image x and uses
+    our model to predict a cleaner version (x_0_pred) then using scheduler it figures out
+    how much noise to remove and updates the image.
 
     Args:
         model: Diffusion model
-        x: Current image (x_t), shape (b, c, h, w)
+        x: Current image (x_t), shape (batch_size, channels, height, width)
         t: Timestep (integer)
         scheduler: Noise scheduler instance (reverse_diffusion_step method)
 
@@ -55,23 +54,18 @@ def sample_timestep(model, x, t, scheduler):
 @torch.no_grad()
 def sample_plots(model, scheduler, image_size, n_samples, save_dir, device):
     """
-    Generate and save images sampled by the reverse diffusion process.
-
-    Args:
-        model: Trained diffusion model
-        scheduler: NoiseScheduler instance
-        image_size: Image size (assumed square)
-        n_samples: Number of samples (batch size)
-        save_dir: Directory to save samples
-        device: torch.device ("cuda" or "cpu")
+    Generate and save images sampled by the reverse diffusion process
     """
     os.makedirs(save_dir, exist_ok=True)
     
+    # Create random noise as start point
     x = torch.randn((n_samples, 3, image_size, image_size), device=device)
     samples = []
     
+    # Start from the last timestep T (full noise) and go backwards to 0 (clean image)
     for t in reversed(range(scheduler.T)):
         x, x_0_pred = sample_timestep(model, x, t, scheduler)
+        # Save a copy of current prediction every 100 steps or at the first step
         if t % 100 == 0 or t == scheduler.T - 1:
             samples.append(x_0_pred.cpu())
     
@@ -94,12 +88,12 @@ def main(cfg: DictConfig):
     model = model_cls(cfg.model.params).to(device)
 
     # Load checkpoint
-    ckpt_path = pjoin("uncond_unet.pth")  #IS IT OKAY???
+    ckpt_path = pjoin("uncond_unet.pth")
     print(f"Loading checkpoint from {ckpt_path}")
     model.load_state_dict(torch.load(ckpt_path, map_location=device))
     model.eval()
 
-    # Load scheduler (for now it's LinearNoiseScheduler)
+    # Load scheduler (for now it's LinearNoiseScheduler) todo change to: cosine
     scheduler = LinearNoiseScheduler(
         n_timesteps=cfg.scheduler.params.get("n_timesteps", 1000),
         beta_start=cfg.scheduler.params.get("beta_start", 0.001),
