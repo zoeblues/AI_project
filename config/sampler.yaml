@@ -1,0 +1,29 @@
+defaults:
+  - model: unet
+  - schedule: linear
+
+sample:
+  image_size: 64
+  n_samples: 16
+  weights_dir: "./outputs"
+  save_dir: "./samples"
+  checkpoint_step: 1000
+  device: "cpu"
+
+model:
+  type: diffusion_lab.models.diffusion.UNet
+  params:
+    base_channels: 64
+    image_size: 128
+    in_channels: 3
+    num_groups: 32
+    time_embedding_factor: 4
+    attention_heads: 4
+    num_layers: 2
+
+scheduler:
+  type: diffusion_lab.models.noise_scheduler.LinearNoiseScheduler
+  params:
+    n_timesteps: 1000
+    beta_start: 0.001
+    beta_end: 0.02

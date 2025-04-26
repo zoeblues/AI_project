@@ -338,7 +338,9 @@ class ResNetBlock(nn.Module):
 			else None
 		)
 		
-		# Perform two convolutions, for the layer before the attention we have diff num of channels so we introduce addtional convolution2d
+		# Perform two convolutions, for the layer before the attention we have diff num of channels,
+		# so we introduce additional conv
+	
 		self.block1 = ConvBlock(in_channels, out_channels, groups=num_groups)
 		self.block2 = ConvBlock(out_channels, out_channels, groups=num_groups)
 		self.residual_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()

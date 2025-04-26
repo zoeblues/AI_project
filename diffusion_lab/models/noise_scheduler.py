@@ -8,7 +8,6 @@ class NoiseScheduler:
 	"""
 	def __init__(self, n_timesteps=1000, device="cpu"):
 		"""
-		todo: description
 		:param n_timesteps: 
 		:param device: Device on which to generate the noise: "cpu"
 		"""

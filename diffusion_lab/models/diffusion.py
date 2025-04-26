@@ -25,8 +25,8 @@ class UNet(nn.Module):
 		
 		# Convert image into a base feature map
 		self.initial_conv = nn.Conv2d(
-			in_channels=in_channels, #3
-			out_channels=base_channels, #64
+			in_channels=in_channels,
+			out_channels=base_channels,
 			kernel_size=3,
 			stride=1,
 			padding=1
