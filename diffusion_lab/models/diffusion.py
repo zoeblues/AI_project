@@ -1,150 +1,176 @@
 """
-File taken from: https://github.com/mattroz/diffusion-ddpm/tree/main
+UNet model for diffusion-based tasks.
+Original source: https://github.com/mattroz/diffusion-ddpm
 """
-from diffusion_lab.models.layers import ConvDownBlock, AttentionDownBlock, AttentionUpBlock, \
-	TransformerPositionEmbedding, ConvUpBlock, \
-	ResNetBlock
 import torch
 import torch.nn as nn
-from omegaconf import DictConfig
 
-
-# Load the config for unet
+from diffusion_lab.models.layers import (
+	ConvDownBlock,
+	AttentionDownBlock,
+	AttentionUpBlock,
+	TransformerPositionEmbedding,
+	ConvUpBlock,
+	ResNetBlock,
+)
 
 
 class UNet(nn.Module):
-	def __init__(self, cfg: DictConfig, device='cpu'):
+	def __init__(self, cfg, device='cpu'):
 		super().__init__()
 		self.cfg = cfg
 		self.device = device
 		
-		# Load parameters from config
-		base_channels = cfg.base_channels
-		in_channels = cfg.in_channels
-		num_att_heads = cfg.attention_heads
-		num_groups = cfg.num_groups
-		num_layers = cfg.num_layers
-		time_emb_channels = base_channels * cfg.time_embedding_factor
-		
-		# Convert image into a base feature map
+		# Initial convolution layer
 		self.initial_conv = nn.Conv2d(
-			in_channels=in_channels,  # 3
-			out_channels=base_channels,  # 64
+			in_channels=cfg.params.in_channels,
+			out_channels=cfg.params.base_channels,
 			kernel_size=3,
 			stride=1,
-			padding=1
+			padding=1,
 		)
 		
-		# Embed a time value into a feature vector
+		# Positional/time embedding
 		self.positional_encoding = nn.Sequential(
-			TransformerPositionEmbedding(dimension=base_channels, device=device),
-			nn.Linear(base_channels, 4 * base_channels),
+			TransformerPositionEmbedding(
+				dimension=cfg.params.base_channels,
+				device=device
+			),
+			nn.Linear(cfg.params.base_channels, 4 * cfg.params.base_channels),
 			nn.GELU(),
-			nn.Linear(4 * base_channels, 4 * base_channels)
+			nn.Linear(4 * cfg.params.base_channels, 4 * cfg.params.base_channels),
 		)
 		
-		# Reduce the spatial size (height/width) of the image
-		# Increase the number of feature channels
+		# Downsampling path
 		self.downsample_blocks = nn.ModuleList([
-			ConvDownBlock(base_channels, base_channels, num_layers, time_emb_channels, num_groups),
-			ConvDownBlock(base_channels, base_channels, num_layers, time_emb_channels, num_groups),
-			ConvDownBlock(base_channels, base_channels * 2, num_layers, time_emb_channels, num_groups),
-			AttentionDownBlock(base_channels * 2, base_channels * 2, num_layers, time_emb_channels, num_groups, num_att_heads),
-			ConvDownBlock(base_channels * 2, base_channels * 4, num_layers, time_emb_channels, num_groups)
+			ConvDownBlock(
+				cfg.params.base_channels,
+				cfg.params.base_channels,
+				cfg.params.num_layers,
+				cfg.params.time_emb_channels,
+				cfg.params.num_groups
+			),
+			ConvDownBlock(
+				cfg.params.base_channels,
+				cfg.params.base_channels,
+				cfg.params.num_layers,
+				cfg.params.time_emb_channels,
+				cfg.params.num_groups
+			),
+			ConvDownBlock(
+				cfg.params.base_channels,
+				cfg.params.base_channels * 2,
+				cfg.params.num_layers,
+				cfg.params.time_emb_channels,
+				cfg.params.num_groups
+			),
+			AttentionDownBlock(
+				cfg.params.base_channels * 2,
+				cfg.params.base_channels * 2,
+				cfg.params.num_layers,
+				cfg.params.time_emb_channels,
+				cfg.params.num_groups,
+				cfg.params.num_att_heads
+			),
+			ConvDownBlock(
+				cfg.params.base_channels * 2,
+				cfg.params.base_channels * 4,
+				cfg.params.num_layers,
+				cfg.params.time_emb_channels,
+				cfg.params.num_groups
+			),
 		])
 		
-		self.bottleneck = AttentionDownBlock(base_channels * 4, base_channels * 4, num_layers, time_emb_channels, num_groups, num_att_heads, downsample=False)
+		# Bottleneck
+		self.bottleneck = AttentionDownBlock(
+			cfg.params.base_channels * 4,
+			cfg.params.base_channels * 4,
+			cfg.params.num_layers,
+			cfg.params.time_emb_channels,
+			cfg.params.num_groups,
+			cfg.params.num_att_heads,
+			downsample=False
+		)
 		
-		# Upscale the features and merge them with the corresponding features from downsampling path
+		# Upsampling path
 		self.upsample_blocks = nn.ModuleList([
-			ConvUpBlock(base_channels * 8, base_channels * 4, num_layers, time_emb_channels, num_groups),
-			AttentionUpBlock(base_channels * 4 + base_channels * 2, base_channels * 2, num_layers, time_emb_channels, num_groups, num_att_heads),
-			ConvUpBlock(base_channels * 4, base_channels * 2, num_layers, time_emb_channels, num_groups),
-			ConvUpBlock(base_channels * 2 + base_channels, base_channels, num_layers, time_emb_channels, num_groups),
-			ConvUpBlock(base_channels * 2, base_channels, num_layers, time_emb_channels, num_groups)
+			ConvUpBlock(
+				cfg.params.base_channels * 8,
+				cfg.params.base_channels * 4,
+				cfg.params.num_layers,
+				cfg.params.time_emb_channels,
+				cfg.params.num_groups
+			),
+			AttentionUpBlock(
+				cfg.params.base_channels * 4 + cfg.params.base_channels * 2,
+				cfg.params.base_channels * 2,
+				cfg.params.num_layers,
+				cfg.params.time_emb_channels,
+				cfg.params.num_groups,
+				cfg.params.num_att_heads
+			),
+			ConvUpBlock(
+				cfg.params.base_channels * 4,
+				cfg.params.base_channels * 2,
+				cfg.params.num_layers,
+				cfg.params.time_emb_channels,
+				cfg.params.num_groups
+			),
+			ConvUpBlock(
+				cfg.params.base_channels * 2 + cfg.params.base_channels,
+				cfg.params.base_channels,
+				cfg.params.num_layers,
+				cfg.params.time_emb_channels,
+				cfg.params.num_groups
+			),
+			ConvUpBlock(
+				cfg.params.base_channels * 2,
+				cfg.params.base_channels,
+				cfg.params.num_layers,
+				cfg.params.time_emb_channels,
+				cfg.params.num_groups
+			),
 		])
 		
-		# Final image output, maps the last processed tensor back to desired num of channels
+		# Output projection
 		self.output_conv = nn.Sequential(
-			nn.GroupNorm(num_channels=base_channels, num_groups=num_groups),
+			nn.GroupNorm(
+				num_channels=cfg.params.base_channels,
+				num_groups=cfg.params.num_groups
+			),
 			nn.SiLU(),
-			nn.Conv2d(base_channels, in_channels, kernel_size=3, padding=1)
+			nn.Conv2d(
+				cfg.params.base_channels,
+				cfg.params.in_channels,
+				kernel_size=3,
+				padding=1
+			)
 		)
 	
 	def forward(self, input_tensor, time):
 		# Embed the time
 		time_encoded = self.positional_encoding(time)
-		# Apply initial conv to image
+		
+		# Initial convolution
 		x = self.initial_conv(input_tensor)
 		
-		# Save for skip connections - prevent network from forgetting input structure
+		# Save inputs for skip connections
 		skip_connections = [x]
 		
-		# Downsample path, save each output for skip connections
+		# Downsampling path
 		for block in self.downsample_blocks:
 			x = block(x, time_encoded)
 			skip_connections.append(x)
 		
+		# Bottleneck
 		x = self.bottleneck(x, time_encoded)
 		
-		# Reverse skip list and remove the last one (bottleneck)
+		# Reverse skip connections (remove bottleneck input)
 		skip_connections = list(reversed(skip_connections))
 		
-		# Upsample path with skip connections
+		# Upsampling path with skip connections
 		for block, skip in zip(self.upsample_blocks, skip_connections):
 			x = torch.cat([x, skip], dim=1)
 			x = block(x, time_encoded)
 		
 		return self.output_conv(x)
-
-
-if __name__ == '__main__':
-	# Please run with working dir as the main project dir
-	import os
-	from PIL import Image
-	from torchvision import transforms
-	
-	
-	def load_image(image_path, size=(128, 128)):
-		image = Image.open(image_path).convert("RGB")
-		transform = transforms.Compose([
-			transforms.Resize(size),
-			transforms.ToTensor(),
-		])
-		return transform(image).unsqueeze(0)  # batch dimension
-	
-	
-	cfg = DictConfig({
-		'base_channels': 64,
-		'image_size': 128,
-		'in_channels': 3,
-		'num_groups': 32,
-		'time_embedding_factor': 4,
-		'attention_heads': 4,
-		'out_channels': 3,
-		'num_layers': 2
-	})
-	
-	# Initialize the model
-	model = UNet(cfg, device='cpu')
-	
-	# Choose input: either dummy tensor or real image
-	use_image = True
-	image_path = "data/resized_images/Cat/cat-test_(1).jpeg"  # Set your image path here
-	
-	if use_image and os.path.exists(image_path):
-		image = load_image(image_path)  # Shape: (1, 3, H, W)
-		print(f"Loaded image from {image_path} with shape {image.shape}")
-	else:
-		image = torch.randn(1, 3, 128, 128)  # Dummy input
-		print("Using dummy image.")
-	
-	# Timestep tensor
-	time = torch.tensor([250], dtype=torch.long)
-	
-	# Run the model
-	model.eval()
-	with torch.no_grad():
-		output = model(image, time)
-	
-	print(f"Output shape: {output.shape}")

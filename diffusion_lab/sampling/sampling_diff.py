@@ -22,6 +22,8 @@ for t=T... 1 do
 return x0
 '''
 
+
+
 @torch.no_grad()
 def sample_timestep(model, x, t, scheduler):
     """
@@ -53,9 +55,6 @@ def sample_timestep(model, x, t, scheduler):
 
 @torch.no_grad()
 def sample_plots(model, scheduler, image_size, n_samples, save_dir, device):
-    """
-    Generate and save images sampled by the reverse diffusion process
-    """
     os.makedirs(save_dir, exist_ok=True)
     
     # Create random noise as start point
@@ -78,6 +77,7 @@ def sample_plots(model, scheduler, image_size, n_samples, save_dir, device):
     plt.title(f"Sampled Images after {scheduler.T} Steps")
     plt.savefig(os.path.join(save_dir, "sampled_images.png"))
     plt.close()
+    
 @hydra.main(config_path="../../config/", config_name="sampler", version_base="1.3")
 def main(cfg: DictConfig):
     device = cfg.sample.device

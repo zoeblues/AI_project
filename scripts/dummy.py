@@ -26,7 +26,7 @@ cfg_model = DictConfig({
 
 # 4. Load your model
 model = UNet(cfg_model, device=device).to(device)
-model.load_state_dict(torch.load("../uncond_unet.pth", map_location=device))  # loading trained weights
+model.load_state_dict(torch.load("../diffusion_lab/sampling/uncond_unet.pth", map_location=device))  # loading trained weights
 model.eval()
 
 # 5. Load your scheduler

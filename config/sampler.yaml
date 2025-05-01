@@ -1,6 +1,6 @@
 defaults:
   - model: unet
-  - schedule: linear
+  - schedule: cosine
 
 sample:
   image_size: 64
@@ -22,8 +22,6 @@ model:
     num_layers: 2
 
 scheduler:
-  type: diffusion_lab.models.noise_scheduler.LinearNoiseScheduler
+  type: diffusion_lab.models.noise_scheduler.CosineNoiseScheduler
   params:
-    n_timesteps: 1000
-    beta_start: 0.001
-    beta_end: 0.02
+    s: 0.008

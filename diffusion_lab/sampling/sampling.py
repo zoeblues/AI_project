@@ -20,12 +20,14 @@ def sample_image(model, scheduler: NoiseScheduler, n_timesteps=1_000, n_images=1
 if __name__ == '__main__':
 	from diffusion_lab.models.noise_scheduler import CosineNoiseScheduler
 	from diffusion_lab.models.diffusion import UNet
-	from omegaconf import DictConfig
+	from omegaconf import DictConfig, OmegaConf
 	
 	from torchvision.transforms import transforms
 	from PIL import Image
 	
-	cfg = DictConfig({
+	# todo: use unet config
+	'''
+		cfg = DictConfig({
 		'base_channels': 64,
 		'image_size': 128,
 		'in_channels': 3,
@@ -36,12 +38,16 @@ if __name__ == '__main__':
 		'num_layers': 2
 	})
 	
+	'''
+
 	to_pil = transforms.ToPILImage()
 	
+	cfg = OmegaConf.load("../../config/model/unet.yaml")
+	
 	# Initialize the model
-	device = 'mps'
-	model = UNet(cfg, device=device)
-	model.load_state_dict(torch.load("outputs/steps/uncond_unet.pth", map_location='cpu'))
+	device = 'cpu'
+	model = UNet(cfg=cfg, device=device)
+	model.load_state_dict(torch.load("uncond_unet.pth", map_location='cpu'))
 	model.to(device)
 	scheduler = CosineNoiseScheduler(1000, device=model.device)
 	
