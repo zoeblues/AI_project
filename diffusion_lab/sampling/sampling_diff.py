@@ -77,6 +77,7 @@ def sample_plots(model, scheduler, image_size, n_samples, save_dir, device):
     plt.title(f"Sampled Images after {scheduler.T} Steps")
     plt.savefig(os.path.join(save_dir, "sampled_images.png"))
     plt.close()
+    # my chcemy zwrocic obrazek a nie pokazac
     
 @hydra.main(config_path="../../config/", config_name="sampler", version_base="1.3")
 def main(cfg: DictConfig):

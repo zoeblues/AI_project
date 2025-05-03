@@ -89,6 +89,7 @@ class LinearNoiseScheduler(NoiseScheduler):
 		# Precompute squares for sampling
 		self.sqrt_alpha_bar = torch.sqrt(self.alpha_bars)
 		self.sqrt_one_minus_alpha_bar = torch.sqrt(1.0 - self.alpha_bars)
+		self.one_minus_alpha = 1.0 - self.alpha_bars
 
 		# Cache for reverse process
 		self.sqrt_recip_alphas = torch.sqrt(1.0 / self.alphas)
@@ -121,7 +122,9 @@ class LinearNoiseScheduler(NoiseScheduler):
 		# Estimate x_0 from predicted noise
 		sqrt_alpha_bar_t = self.sqrt_alpha_bar[t]
 		sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alpha_bar[t]
-		x_0_pred = (x_t - sqrt_one_minus_alpha_bar_t * predicted_noise) / sqrt_alpha_bar_t
+		one_minus_alpha_t = self.one_minus_alpha[t]
+		
+		x_0_pred = ((x_t - ((one_minus_alpha_t * predicted_noise)/(sqrt_one_minus_alpha_bar_t))) / sqrt_alpha_bar_t)
 		x_0_pred = torch.clamp(x_0_pred, -1.0, 1.0)
 
 		# Compute posterior mean
