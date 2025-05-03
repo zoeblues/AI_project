@@ -10,22 +10,25 @@ def sample_image(model, scheduler: NoiseScheduler, n_timesteps=1_000, n_images=1
 	model.eval()
 	x_t = torch.randn((n_images, 3, *resolution), device=model.device)  # B, C, W, H
 	with torch.no_grad():
-		for t in reversed(range(n_timesteps)):
+		for t in reversed(range(1, n_timesteps)):
+			print(t)
 			t = torch.tensor([t], device=model.device)
 			epsilon = model(x_t, t)
-			x_t = scheduler.p_backward(x_t, epsilon, t)
+			x_t, _ = scheduler.p_backward(x_t, epsilon, t)
 	return x_t
 
 
 if __name__ == '__main__':
-	from diffusion_lab.models.noise_scheduler import CosineNoiseScheduler
+	from diffusion_lab.models.noise_scheduler import CosineNoiseScheduler, LinearNoiseScheduler
 	from diffusion_lab.models.diffusion import UNet
-	from omegaconf import DictConfig
+	from omegaconf import DictConfig, OmegaConf
 	
 	from torchvision.transforms import transforms
 	from PIL import Image
 	
-	cfg = DictConfig({
+	# todo: use unet config
+	'''
+		cfg = DictConfig({
 		'base_channels': 64,
 		'image_size': 128,
 		'in_channels': 3,
@@ -36,24 +39,34 @@ if __name__ == '__main__':
 		'num_layers': 2
 	})
 	
-	to_pil = transforms.ToPILImage()
+	'''
+	
+	to_pil = transforms.Compose([
+		transforms.Normalize(  # Normalize RGB pixel values: [-1, 1] -> [0, 1]
+			mean=[-1.0, -1.0, -1.0],
+			std=[2.0, 2.0, 2.0]
+		),
+		transforms.ToPILImage(),
+	])
+	
+	cfg = OmegaConf.load("config/model/unet.yaml")
 	
 	# Initialize the model
 	device = 'mps'
-	model = UNet(cfg, device=device)
-	model.load_state_dict(torch.load("outputs/steps/uncond_unet.pth", map_location='cpu'))
+	model = UNet(cfg=cfg, device=device)
+	model.load_state_dict(torch.load("outputs/steps/uncond_unet.pth", map_location=device))
 	model.to(device)
 	scheduler = CosineNoiseScheduler(1000, device=model.device)
 	
 	x_t = torch.randn((1, 3, 64, 64), device=model.device)  # B, C, W, H
 	epsilon_t = model(x_t, torch.tensor([999], device=model.device))
-	x_0 = x_t - epsilon_t
+	x_t_m_1, x_0 = scheduler.p_backward(x_t, epsilon_t, torch.tensor([999]))
+	sampled = sample_image(model, scheduler, n_timesteps=1_000, n_images=1, resolution=(64, 64))
 	
-	image_tensor = x_0[0]
-	
-	bgc = Image.new('RGB', (64 * 3, 64), color='white')
+	bgc = Image.new('RGB', (64 * 4, 64), color='white')
 	
 	bgc.paste(to_pil(x_t[0]), (0, 0))
 	bgc.paste(to_pil(epsilon_t[0]), (64, 0))
-	bgc.paste(to_pil(image_tensor), (128, 0))
+	bgc.paste(to_pil(x_0[0]), (128, 0))
+	bgc.paste(to_pil(sampled[0]), (192, 0))
 	bgc.show()
