@@ -13,6 +13,9 @@ class NoiseScheduler:
 		"""
 		self.T = n_timesteps
 		self.device = device
+		self.betas = torch.zeros(n_timesteps, device=self.device)
+		self.alphas = torch.zeros(n_timesteps, device=self.device)
+		self.alpha_bars = torch.zeros(n_timesteps, device=self.device)
 		
 		# to be overwritten by children
 		self.sigma = torch.zeros(n_timesteps, device=self.device)
@@ -78,7 +81,7 @@ class LinearNoiseScheduler(NoiseScheduler):
 	"""
 	Scheduler for a linear beta schedule. Beta increases linearly from beta_start to beta_end.
 	"""
-	def __init__(self, n_timesteps=1000, beta_start=0.001, beta_end=0.02, device="cpu"):
+	def __init__(self, n_timesteps=1000, beta_start=0.0001, beta_end=0.02, device="cpu"):
 		super().__init__(n_timesteps, device)
 
 		# Linearly spaced beta values
@@ -95,55 +98,11 @@ class LinearNoiseScheduler(NoiseScheduler):
 		self.sqrt_recip_alphas = torch.sqrt(1.0 / self.alphas)
 		self.posterior_variance = (self.betas * (1.0 - torch.cat([torch.tensor([1.0]), self.alpha_bars[:-1]])) / (1.0 - self.alpha_bars))
 
-	def q_forward(self, x_0, t):
-		"""
-        Overrides base method: forward diffusion process that adds Gaussian noise to the input image x_0.
-        """
-		noise = torch.randn_like(x_0, device=self.device)
-		# Compute square root of alpha bar at given timestep
-		sqrt_alpha_bar_t = self.sqrt_alpha_bar[t].view(-1, 1, 1, 1)
-		# Compute square root of alpha bar -1 at given timestep
-		sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alpha_bar[t].view(-1, 1, 1, 1)
-		return sqrt_alpha_bar_t * x_0 + sqrt_one_minus_alpha_bar_t * noise
+	
 
-	def reverse_diffusion_step(self, x_t, predicted_noise, t):
-		"""
-        Reverse diffusion process: estimate x_{t-1} from x_t and predicted noise.
+def main():
+    scheduler = LinearNoiseScheduler()
+    print("First beta value:", scheduler.betas[0].item())
 
-        :param x_t: image with noise at time t, shape: [b, c, h, w]
-        :param predicted_noise: prediction of noise made by the model, shape: [b, c, h, w]
-        :param t: timestep as int (scalar, not a batch)
-        :return: tuple of (x_{t-1}, predicted x_0)
-        """
-		# Ensure scalar timestep
-		if isinstance(t, torch.Tensor):
-			t = t.item()
-
-		# Estimate x_0 from predicted noise
-		sqrt_alpha_bar_t = self.sqrt_alpha_bar[t]
-		sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alpha_bar[t]
-		one_minus_alpha_t = self.one_minus_alpha[t]
-		
-		x_0_pred = ((x_t - ((one_minus_alpha_t * predicted_noise)/(sqrt_one_minus_alpha_bar_t))) / sqrt_alpha_bar_t)
-		x_0_pred = torch.clamp(x_0_pred, -1.0, 1.0)
-
-		# Compute posterior mean
-		# Noise level at timestep t:
-		beta_t = self.betas[t]
-		alpha_t = self.alphas[t]
-		sqrt_recip_alpha_t = self.sqrt_recip_alphas[t]
-		# Compute the mean of the reverse distribution
-		posterior_mean = sqrt_recip_alpha_t * (x_t - beta_t * predicted_noise / sqrt_one_minus_alpha_bar_t)
-
-		# No need to add noise at timestep t=0
-		if t == 0:
-			return posterior_mean, x_0_pred
-
-		# Add stochastic noise to simulate reverse diffusion
-		# Sample a random noise vector
-		noise = torch.randn_like(x_t)
-		variance = self.posterior_variance[t]
-		std_dev = torch.sqrt(variance)
-		x_prev = posterior_mean + std_dev * noise
-
-		return x_prev, x_0_pred
+if __name__ == "__main__":
+    main()
