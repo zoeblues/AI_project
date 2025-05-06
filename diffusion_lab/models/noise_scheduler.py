@@ -97,7 +97,7 @@ if __name__ == "__main__":
 	from PIL import Image
 	from torchvision import transforms
 	
-	path = 'data/resized_images/Cat/cat-test_(1).jpeg'
+	path = '../data/resized_images/Cat/cat-test_(1).jpeg'
 	image = Image.open(path).convert('RGB')
 	
 	train_transformation = transforms.Compose([
@@ -120,7 +120,7 @@ if __name__ == "__main__":
 	
 	bgc = Image.new('RGB', (64 * 11, 64 * 2), color='white')
 	
-	scheduler = LinearNoiseScheduler()
+	scheduler = CosineNoiseScheduler()
 	
 	x_0 = train_transformation(image)
 	x_0 = x_0.unsqueeze(0)

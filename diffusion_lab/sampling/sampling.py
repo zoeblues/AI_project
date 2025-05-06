@@ -6,7 +6,7 @@ import torch.nn as nn
 from diffusion_lab.models.noise_scheduler import NoiseScheduler
 
 
-def sample_image(model, scheduler: NoiseScheduler, n_timesteps=1_000, n_images=1, resolution=(64, 64)):
+def sample_image(model, scheduler: NoiseScheduler, n_timesteps=1_000, n_images=1, resolution=(128, 128)):
 	model.eval()
 	x_t = torch.randn((n_images, 3, *resolution), device=model.device)  # B, C, W, H
 	with torch.no_grad():
@@ -29,7 +29,7 @@ if __name__ == '__main__':
 	# todo: use unet config
 	'''
 		cfg = DictConfig({
-		'base_channels': 64,
+		'base_channels': 128,
 		'image_size': 128,
 		'in_channels': 3,
 		'num_groups': 32,
@@ -49,24 +49,24 @@ if __name__ == '__main__':
 		transforms.ToPILImage(),
 	])
 	
-	cfg = OmegaConf.load("config/model/unet.yaml")
+	cfg = OmegaConf.load("../../config/model/unet.yaml")
 	
 	# Initialize the model
-	device = 'mps'
+	device = 'cpu'
 	model = UNet(cfg=cfg, device=device)
-	model.load_state_dict(torch.load("outputs/steps/uncond_unet.pth", map_location=device))
+	model.load_state_dict(torch.load("outputs/uncond_unet.pth", map_location=device))
 	model.to(device)
 	scheduler = CosineNoiseScheduler(1000, device=model.device)
 	
-	x_t = torch.randn((1, 3, 64, 64), device=model.device)  # B, C, W, H
+	x_t = torch.randn((1, 3, 128, 128), device=model.device)  # B, C, W, H
 	epsilon_t = model(x_t, torch.tensor([999], device=model.device))
 	x_t_m_1, x_0 = scheduler.p_backward(x_t, epsilon_t, torch.tensor([999]))
-	sampled = sample_image(model, scheduler, n_timesteps=1_000, n_images=1, resolution=(64, 64))
+	sampled = sample_image(model, scheduler, n_timesteps=1_000, n_images=1, resolution=(128, 128))
 	
-	bgc = Image.new('RGB', (64 * 4, 64), color='white')
+	bgc = Image.new('RGB', (128 * 4, 128), color='white')
 	
 	bgc.paste(to_pil(x_t[0]), (0, 0))
-	bgc.paste(to_pil(epsilon_t[0]), (64, 0))
-	bgc.paste(to_pil(x_0[0]), (128, 0))
-	bgc.paste(to_pil(sampled[0]), (192, 0))
+	bgc.paste(to_pil(epsilon_t[0]), (128, 0))
+	bgc.paste(to_pil(x_0[0]), (256, 0))
+	bgc.paste(to_pil(sampled[0]), (384, 0))
 	bgc.show()

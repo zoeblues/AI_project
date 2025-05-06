@@ -1,7 +1,7 @@
 import torch
 import os
 from diffusion_lab.models.diffusion import UNet
-from diffusion_lab.models.noise_scheduler import LinearNoiseScheduler
+from diffusion_lab.models.noise_scheduler import NoiseScheduler
 from diffusion_lab.sampling.sampling_diff import sample_plots
 # 1. Set device
 device = "cpu"
@@ -26,17 +26,11 @@ cfg_model = DictConfig({
 
 # 4. Load your model
 model = UNet(cfg_model, device=device).to(device)
-model.load_state_dict(torch.load("../diffusion_lab/sampling/uncond_unet.pth", map_location=device))  # loading trained weights
+model.load_state_dict(torch.load("../diffusion_lab/sampling/outputs/uncond_unet.pth", map_location=device))  # loading trained weights
 model.eval()
 
-# 5. Load your scheduler
-scheduler = LinearNoiseScheduler(
-    n_timesteps=1000,
-    beta_start=0.001,
-    beta_end=0.02,
-    device=device
-)
-
+# 5. Cosine your scheduler
+scheduler = CosineNoiseScheduler(1000, device=model.device)
 # 6. Call sample_plots
 sample_plots(
     model=model,

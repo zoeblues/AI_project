@@ -1,109 +1,70 @@
-import math
-import numpy as np
 import torch
-import torch.nn as nn
-import matplotlib.pyplot as plt
-import torchvision.utils as vutils
-import os
-import hydra
-from omegaconf import DictConfig
-import importlib
-from os.path import join as pjoin
-from diffusion_lab.models.noise_scheduler import LinearNoiseScheduler
-
-'''
-Sampling process = "Hey, if you saw this noisy image, how would you reverse it?"
-
-based on 'Algorithm 2 Sampling' from DDPM paper
-xT~ N(0,I)
-for t=T... 1 do
-	z~N(0,I) if t>1, else z=0
-	xt-1 = 1/sqrt(alpha_t) * ((xt - 1-alpha_t)/(sqrt(1-alpha_bar_t)epislon_theta(xt,t)) + sigmat*z
-return x0
-'''
+from PIL import Image
+from torchvision import transforms
+from diffusion_lab.models.noise_scheduler import CosineNoiseScheduler, NoiseScheduler, LinearNoiseScheduler
+from diffusion_lab.models.diffusion import UNet
+from omegaconf import OmegaConf
 
 
-
-@torch.no_grad()
-def sample_timestep(model, x, t, scheduler):
-    """
-    Denoises the image at a single step. It takes the noisy image x and uses
-    our model to predict a cleaner version (x_0_pred) then using scheduler it figures out
-    how much noise to remove and updates the image.
-
-    Args:
-        model: Diffusion model
-        x: Current image (x_t), shape (batch_size, channels, height, width)
-        t: Timestep (integer)
-        scheduler: Noise scheduler instance (reverse_diffusion_step method)
-
-    Returns:
-        x_prev: Next image (x_{t-1})
-        x_0_pred: Predicted denoised image (x_0)
-    """
-    
-    # Make sure t is a tensor matching with batch size
-    if isinstance(t, int):
-        t_tensor = torch.full((x.size(0),), t, device=x.device, dtype=torch.long)
-    else:
-        t_tensor = t
-
-    predicted_noise = model(x, t_tensor)
-    x_prev, x_0_pred = scheduler.reverse_diffusion_step(x, predicted_noise, t)
-    return x_prev, x_0_pred
+def sample_from_scheduler(model, scheduler: NoiseScheduler, n_timesteps=1000, resolution=(128, 128), device="cpu"):
+	model.eval()
+	with torch.no_grad():
+		x_t = torch.randn((1, 3, *resolution), device=model.device)
+		for t in reversed(range(1, n_timesteps)):
+			t_tensor = torch.full((1,), t, dtype=torch.long, device=model.device)
+			epsilon_pred = model(x_t, t_tensor)
+			x_t, _ = scheduler.p_backward(x_t, epsilon_pred, t_tensor)
+	
+	to_pil = transforms.Compose([
+		transforms.Normalize(mean=[-1.0, -1.0, -1.0], std=[2.0, 2.0, 2.0]),
+		transforms.ToPILImage()
+	])
+	x_img = x_t[0].cpu().clamp(-1, 1)  # Extract single image (C, H, W)
+	return to_pil(x_img)
 
 
-@torch.no_grad()
-def sample_plots(model, scheduler, image_size, n_samples, save_dir, device):
-    os.makedirs(save_dir, exist_ok=True)
-    
-    # Create random noise as start point
-    x = torch.randn((n_samples, 3, image_size, image_size), device=device)
-    samples = []
-    
-    # Start from the last timestep T (full noise) and go backwards to 0 (clean image)
-    for t in reversed(range(scheduler.T)):
-        x, x_0_pred = sample_timestep(model, x, t, scheduler)
-        # Save a copy of current prediction every 100 steps or at the first step
-        if t % 100 == 0 or t == scheduler.T - 1:
-            samples.append(x_0_pred.cpu())
-    
-    # Create and save grid of final denoised samples
-    grid = vutils.make_grid(samples[-1], nrow=int(np.sqrt(n_samples)), normalize=True, value_range=(-1, 1))
-    
-    plt.figure(figsize=(8, 8))
-    plt.imshow(grid.permute(1, 2, 0).numpy())
-    plt.axis("off")
-    plt.title(f"Sampled Images after {scheduler.T} Steps")
-    plt.savefig(os.path.join(save_dir, "sampled_images.png"))
-    plt.close()
-    # my chcemy zwrocic obrazek a nie pokazac
-    
-@hydra.main(config_path="../../config/", config_name="sampler", version_base="1.3")
-def main(cfg: DictConfig):
-    device = cfg.sample.device
-
-    # Load model
-    model_path, model_name = cfg.model.type.rsplit(".", 1)
-    model_cls = getattr(importlib.import_module(model_path), model_name)
-    model = model_cls(cfg.model.params).to(device)
-
-    # Load checkpoint
-    ckpt_path = pjoin("uncond_unet.pth")
-    print(f"Loading checkpoint from {ckpt_path}")
-    model.load_state_dict(torch.load(ckpt_path, map_location=device))
-    model.eval()
-
-    # Load scheduler (for now it's LinearNoiseScheduler) todo change to: cosine
-    scheduler = LinearNoiseScheduler(
-        n_timesteps=cfg.scheduler.params.get("n_timesteps", 1000),
-        beta_start=cfg.scheduler.params.get("beta_start", 0.001),
-        beta_end=cfg.scheduler.params.get("beta_end", 0.02),
-        device=device
-    )
-    
-    # Generate and save samples
-    sample_plots(model, scheduler, cfg.sample.image_size, cfg.sample.n_samples, cfg.sample.save_dir, device)
 
 if __name__ == "__main__":
-    main()
+	device = 'cpu'
+	resolution = (128, 128)
+
+	to_pil = transforms.Compose([
+		transforms.Normalize(mean=[-1.0, -1.0, -1.0], std=[2.0, 2.0, 2.0]),
+		transforms.ToPILImage(),
+	])
+
+	# Load model config and model
+	cfg = OmegaConf.load("../../config/model/unet.yaml")
+	model = UNet(cfg=cfg, device=device)
+	model.load_state_dict(torch.load("outputs/uncond_unet.pth", map_location=device))
+	model.to(device)
+	model.eval()
+
+	scheduler = CosineNoiseScheduler(n_timesteps=1000, device=device)
+
+	# Start from noise
+	x_t = torch.randn((1, 3, 128, 128), device=device)
+	timestep = torch.tensor([999], device=device)
+	epsilon_t = model(x_t, timestep)
+
+	# One reverse step
+	x_t_m_1, x_0_pred = scheduler.p_backward(x_t, epsilon_t, timestep)
+
+	# Full sampling
+	sampled_img = sample_from_scheduler(model, scheduler, n_timesteps=900, resolution=resolution, device=device)
+	
+	canvas_width = 128 * 3
+	canvas_height = 128
+	bgc = Image.new('RGB', (canvas_width, canvas_height), color='white')
+	
+	# Convert tensors to PIL images
+	initial_noise_img = to_pil(x_t[0].cpu().clamp(-1, 1))
+	predicted_x0_img = to_pil(x_0_pred[0].cpu().clamp(-1, 1))
+	final_sampled_img = sampled_img  # already PIL
+	
+	# Paste them side by side
+	bgc.paste(initial_noise_img, (0, 0))  # First slot
+	bgc.paste(predicted_x0_img, (128, 0))  # Second slot
+	bgc.paste(final_sampled_img, (256, 0))
+	
+	bgc.show()

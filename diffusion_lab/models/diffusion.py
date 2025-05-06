@@ -148,13 +148,10 @@ class UNet(nn.Module):
 		)
 	
 	def forward(self, input_tensor, time):
-		# Embed the time
 		time_encoded = self.positional_encoding(time)
 		
-		# Initial convolution
 		x = self.initial_conv(input_tensor)
 		
-		# Save inputs for skip connections
 		skip_connections = [x]
 		
 		# Downsampling path
@@ -174,3 +171,12 @@ class UNet(nn.Module):
 			x = block(x, time_encoded)
 		
 		return self.output_conv(x)
+
+
+
+
+
+
+
+
+
