@@ -18,7 +18,7 @@ class NoiseScheduler:
 		self.betas = torch.zeros(n_timesteps, device=self.device)
 		self.alphas = torch.zeros(n_timesteps, device=self.device)
 		self.alpha_bars = torch.zeros(n_timesteps, device=self.device)
-		
+	
 	def q_forward(self, x_0, t):
 		"""
 		Forward diffusion process, adding Gaussian noise to the image :math:`x_0`.
@@ -39,19 +39,25 @@ class NoiseScheduler:
 		return x_t, epsilon
 	
 	def p_backward(self, x_t, epsilon_t, t):
+		batch_size = x_t.size(0)
+		t = t.view(-1) if t.ndim == 0 else t
+		
 		z = torch.randn_like(x_t, device=self.device) if t > 1 else torch.zeros_like(x_t, device=self.device)
 		
-		beta_t = self.betas[t][:, None, None, None]
-		alpha_t = self.alphas[t][:, None, None, None]
-		alpha_bar = self.alpha_bars[t][:, None, None, None]
+		beta_t = self.betas[t].view(batch_size, 1, 1, 1)
+		alpha_t = self.alphas[t].view(batch_size, 1, 1, 1)
+		alpha_bar = self.alpha_bars[t].view(batch_size, 1, 1, 1)
+		alpha_bar_tm1 = self.alpha_bars[t - 1].view(batch_size, 1, 1, 1)
 		
-		x_t_minus_one = (x_t - (1 - alpha_t) / torch.sqrt(1 - alpha_bar) * epsilon_t) / torch.sqrt(alpha_t)
-		# x_t_minus_one = torch.clamp(x_t_minus_one, -1.0, 1.0)
+		x_0_pred = (x_t - torch.sqrt(1 - alpha_bar) * epsilon_t) / torch.sqrt(alpha_bar)
+		# x_0_pred = torch.clamp(x_0_pred, min=-1, max=1)
 		
-		pred_x_0 = (x_t - (1 - alpha_bar) / torch.sqrt(1 - alpha_bar) * epsilon_t) / torch.sqrt(alpha_t)
+		x_t_prev = torch.sqrt(alpha_bar_tm1) * x_0_pred + torch.sqrt(1 - alpha_bar_tm1) * z
+		# x_t_prev = (1 / torch.sqrt(alpha_t)) * (x_t - (1 - alpha_t) / (torch.sqrt(alpha_bar)) * epsilon_t) + torch.sqrt(1-alpha_t) * z
+		# x_t_prev = torch.clamp(x_t_prev, -1, 1)
 		# pred_x_0 = torch.clamp(pred_x_0, -1.0, 1.0)
 		
-		return x_t_minus_one + torch.sqrt(beta_t) * z, pred_x_0
+		return x_t_prev, x_0_pred
 
 
 class CosineNoiseScheduler(NoiseScheduler):
@@ -62,7 +68,7 @@ class CosineNoiseScheduler(NoiseScheduler):
 	
 	def __init__(self, n_timesteps=1000, s=0.008, device="cpu"):
 		super().__init__(n_timesteps, device)
-		x = torch.linspace(0, n_timesteps, n_timesteps + 1, device=device)
+		x = torch.arange(0, n_timesteps + 1, device=device)
 		
 		# Calculate alpha_bar according to the formula
 		alphas_bar = torch.cos(((x / n_timesteps) + s) / (1 + s) * np.pi * 0.5) ** 2
@@ -72,12 +78,12 @@ class CosineNoiseScheduler(NoiseScheduler):
 		betas = torch.clip(betas, 0.0001, 0.9999)
 		# Calculate back into alpha_bar from beta
 		alphas = 1.0 - betas
-		alpha_bars = torch.cumprod(alphas, dim=0)
+		# alphas_bar = torch.cumprod(alphas, dim=0)
 		
 		self.betas = betas
 		self.alphas = alphas
-		self.alpha_bars = alphas_bar
-		
+		self.alpha_bars = alphas_bar[:-1]
+
 
 class LinearNoiseScheduler(NoiseScheduler):
 	"""
@@ -91,7 +97,7 @@ class LinearNoiseScheduler(NoiseScheduler):
 		self.betas = torch.linspace(beta_start, beta_end, n_timesteps, device=self.device)
 		self.alphas = 1.0 - self.betas
 		self.alpha_bars = torch.cumprod(self.alphas, dim=0)
-		
+
 
 if __name__ == "__main__":
 	from PIL import Image
@@ -120,7 +126,7 @@ if __name__ == "__main__":
 	
 	bgc = Image.new('RGB', (64 * 11, 64 * 2), color='white')
 	
-	scheduler = LinearNoiseScheduler()
+	scheduler = CosineNoiseScheduler(n_timesteps=10)
 	
 	x_0 = train_transformation(image)
 	x_0 = x_0.unsqueeze(0)
@@ -131,10 +137,9 @@ if __name__ == "__main__":
 		# t = 600
 		
 		x_t, epsilon = scheduler.q_forward(x_0, torch.tensor([t]))
-		bgc.paste(to_pil(x_t[0]), (64 + 64*(t//100), 0))
+		bgc.paste(to_pil(x_t[0]), (64 + 64 * (t // 100), 0))
 		
 		_, x_0_pred = scheduler.p_backward(x_t, epsilon, torch.tensor([t]))
-		bgc.paste(to_pil(x_0_pred[0]), (64 + 64*(t//100), 64))
-		
-	bgc.show()
+		bgc.paste(to_pil(x_0_pred[0]), (64 + 64 * (t // 100), 64))
 	
+	bgc.show()

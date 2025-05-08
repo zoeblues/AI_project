@@ -11,10 +11,10 @@ def sample_image(model, scheduler: NoiseScheduler, n_timesteps=1_000, n_images=1
 	x_t = torch.randn((n_images, 3, *resolution), device=model.device)  # B, C, W, H
 	with torch.no_grad():
 		for t in reversed(range(1, n_timesteps)):
-			print(t)
-			t = torch.tensor([t], device=model.device)
-			epsilon = model(x_t, t)
-			x_t, _ = scheduler.p_backward(x_t, epsilon, t)
+			t_tensor = torch.full((n_images,), t, device=model.device, dtype=torch.long)
+			epsilon = model(x_t, t_tensor)
+			print(t, torch.mean(epsilon), torch.std(epsilon))
+			x_t, _ = scheduler.p_backward(x_t, epsilon, t_tensor)
 	return x_t
 
 
@@ -54,9 +54,9 @@ if __name__ == '__main__':
 	# Initialize the model
 	device = 'mps'
 	model = UNet(cfg=cfg, device=device)
-	model.load_state_dict(torch.load("outputs/steps/uncond_unet.pth", map_location=device))
+	model.load_state_dict(torch.load("/Volumes/Filip'sTech/outputs/2025-05-08/12-04-20/steps/step-300.pth", map_location=device))
 	model.to(device)
-	scheduler = CosineNoiseScheduler(1000, device=model.device)
+	scheduler = LinearNoiseScheduler(1000, device=model.device)
 	
 	x_t = torch.randn((1, 3, 64, 64), device=model.device)  # B, C, W, H
 	epsilon_t = model(x_t, torch.tensor([999], device=model.device))
@@ -65,8 +65,8 @@ if __name__ == '__main__':
 	
 	bgc = Image.new('RGB', (64 * 4, 64), color='white')
 	
-	bgc.paste(to_pil(x_t[0]), (0, 0))
-	bgc.paste(to_pil(epsilon_t[0]), (64, 0))
-	bgc.paste(to_pil(x_0[0]), (128, 0))
+	# bgc.paste(to_pil(x_t[0]), (0, 0))
+	# bgc.paste(to_pil(epsilon_t[0]), (64, 0))
+	# bgc.paste(to_pil(x_0[0]), (128, 0))
 	bgc.paste(to_pil(sampled[0]), (192, 0))
 	bgc.show()
