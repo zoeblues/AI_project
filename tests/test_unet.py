@@ -24,7 +24,9 @@ def test_denoise(model: UNet, scheduler: NoiseScheduler, img_tensor: torch.Tenso
 	# Change to batch form (shape) -> (1, shape)
 	img_tensor = img_tensor.unsqueeze(0)
 	
-	noised_img, noise = scheduler.q_forward(img_tensor, timestep)
+	noise = torch.randn_like(img_tensor, device=device)
+	
+	noised_img, noise = scheduler.q_forward(img_tensor, timestep, epsilon=noise)
 	# img = noise[0][0].cpu().numpy()
 	# img = noise[0][1].cpu().numpy()
 	# img = noise[0][2].cpu().numpy()
@@ -35,9 +37,10 @@ def test_denoise(model: UNet, scheduler: NoiseScheduler, img_tensor: torch.Tenso
 
 
 def main():
+	# DO NOT CHANGE! Read comment on the bottom!
 	cfg = OmegaConf.load("config/model/unet.yaml")
-	
-	path = 'data/resized_images/Cat/cat-test_(9).jpeg'
+	# DO NOT CHANGE! Read comment on the bottom! 9
+	path = 'data/resized_images/Cat/cat-test_(1).jpeg'
 	image = Image.open(path).convert('RGB')
 	
 	to_tensor = transforms.Compose([
@@ -94,39 +97,5 @@ def main():
 
 
 if __name__ == '__main__':
-	import torch
-	import math
-	import pandas as pd
-	
-	# Total timesteps
-	T = 1000
-	s = 0.008
-	
-	# Compute cosine schedule
-	timesteps = torch.arange(0, T + 1, dtype=torch.float32)
-	f_t = (timesteps / T + s) / (1 + s)
-	alpha_bar = torch.cos(f_t * math.pi / 2) ** 2
-	
-	# Compute alpha and beta
-	alpha = alpha_bar[1:] / alpha_bar[:-1]
-	beta = 1 - alpha
-	
-	# Get last 10 steps
-	last_steps = list(range(T - 10, T))
-	print(last_steps)
-	df = pd.DataFrame({
-		't': last_steps,
-		'alpha_bar[t-1]': alpha_bar[last_steps].numpy(),
-		'alpha_bar[t]': alpha_bar[last_steps[0] + 1:T + 1].numpy(),
-		'alpha[t]': alpha[last_steps[0]:T].numpy(),
-		'beta[t]': beta[last_steps[0]:T].numpy()
-	})
-	# print(df)
-	
-	for row in df.iterrows():
-		print(f"t: {row[1]['t']:.7f} | a_bar: {row[1]['alpha_bar[t-1]']:.7f} | a: {row[1]['alpha[t]']:.7f} | B: {row[1]['beta[t]']:.7f}")
-	
-	# print(df.to_string(index=False))
-	
 	# !!! Remember to set your working dir to the main project dir
 	main()
