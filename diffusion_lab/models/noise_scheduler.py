@@ -19,7 +19,7 @@ class NoiseScheduler:
 		self.alphas = torch.zeros(n_timesteps, device=self.device)
 		self.alpha_bars = torch.zeros(n_timesteps, device=self.device)
 	
-	def q_forward(self, x_0, t):
+	def q_forward(self, x_0, t, epsilon=None):
 		"""
 		Forward diffusion process, adding Gaussian noise to the image :math:`x_0`.
 
@@ -32,7 +32,8 @@ class NoiseScheduler:
 		:return: Noised image tensors, shape: (b, c, h, w)
 		"""
 		
-		epsilon = torch.randn_like(x_0, device=self.device)
+		if epsilon is None:
+			epsilon = torch.randn_like(x_0, device=self.device)
 		x_t = (torch.sqrt(self.alpha_bars[t][:, None, None, None]) * x_0 +
 		       torch.sqrt(1 - self.alpha_bars[t][:, None, None, None]) * epsilon)
 		
@@ -50,12 +51,14 @@ class NoiseScheduler:
 		alpha_bar_tm1 = self.alpha_bars[t - 1].view(batch_size, 1, 1, 1)
 		
 		x_0_pred = (x_t - torch.sqrt(1 - alpha_bar) * epsilon_t) / torch.sqrt(alpha_bar)
+		img = x_0_pred[0][0].cpu().detach().numpy()
 		# x_0_pred = torch.clamp(x_0_pred, min=-1, max=1)
 		
 		x_t_prev = torch.sqrt(alpha_bar_tm1) * x_0_pred + torch.sqrt(1 - alpha_bar_tm1) * z
 		# x_t_prev = (1 / torch.sqrt(alpha_t)) * (x_t - (1 - alpha_t) / (torch.sqrt(alpha_bar)) * epsilon_t) + torch.sqrt(1-alpha_t) * z
 		# x_t_prev = torch.clamp(x_t_prev, -1, 1)
 		# pred_x_0 = torch.clamp(pred_x_0, -1.0, 1.0)
+		img = x_t_prev[0][0].cpu().detach().numpy()
 		
 		return x_t_prev, x_0_pred
 
@@ -124,22 +127,23 @@ if __name__ == "__main__":
 		transforms.ToPILImage(),
 	])
 	
-	bgc = Image.new('RGB', (64 * 11, 64 * 2), color='white')
+	bgc = Image.new('RGB', (64 * (11 + 1), 64 * 3), color='white')
 	
-	scheduler = CosineNoiseScheduler(n_timesteps=10)
+	scheduler = CosineNoiseScheduler(n_timesteps=1000)
 	
 	x_0 = train_transformation(image)
 	x_0 = x_0.unsqueeze(0)
 	
 	bgc.paste(to_pil(x_0[0]), (0, 0))
 	
-	for t in range(0, 1000, 100):
+	for t in reversed(list(range(0, 1000, 100)) + [999]):
 		# t = 600
 		
 		x_t, epsilon = scheduler.q_forward(x_0, torch.tensor([t]))
-		bgc.paste(to_pil(x_t[0]), (64 + 64 * (t // 100), 0))
+		bgc.paste(to_pil(x_t[0]), (64 + 64 * ((t + 1) // 100), 0))
 		
-		_, x_0_pred = scheduler.p_backward(x_t, epsilon, torch.tensor([t]))
-		bgc.paste(to_pil(x_0_pred[0]), (64 + 64 * (t // 100), 64))
+		x_prev, x_0_pred = scheduler.p_backward(x_t, epsilon, torch.tensor([t]))
+		bgc.paste(to_pil(x_0_pred[0]), (64 + 64 * ((t + 1) // 100), 64))
+		bgc.paste(to_pil(x_prev[0]), (64 + 64 * ((t + 1) // 100), 128))
 	
 	bgc.show()
