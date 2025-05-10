@@ -45,6 +45,13 @@ class UNet(nn.Module):
 		self.downsample_blocks = nn.ModuleList([
 			ConvDownBlock(
 				cfg.params.base_channels,
+				cfg.params.base_channels,
+				cfg.params.num_layers,
+				cfg.params.time_emb_channels,
+				cfg.params.num_groups
+			),
+			ConvDownBlock(
+				cfg.params.base_channels,
 				cfg.params.base_channels * 2,
 				cfg.params.num_layers,
 				cfg.params.time_emb_channels,
@@ -97,6 +104,13 @@ class UNet(nn.Module):
 			),
 			ConvUpBlock(
 				cfg.params.base_channels * 2 + cfg.params.base_channels * 2,
+				cfg.params.base_channels * 2,
+				cfg.params.num_layers,
+				cfg.params.time_emb_channels,
+				cfg.params.num_groups
+			),
+			ConvUpBlock(
+				cfg.params.base_channels * 2 + cfg.params.base_channels,
 				cfg.params.base_channels,
 				cfg.params.num_layers,
 				cfg.params.time_emb_channels,
