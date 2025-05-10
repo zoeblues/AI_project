@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from torchvision import transforms
 
 
 class NoiseScheduler:
@@ -51,6 +52,9 @@ class NoiseScheduler:
 		alpha_bar_tm1 = self.alpha_bars[t - 1].view(batch_size, 1, 1, 1)
 		
 		x_0_pred = (x_t - torch.sqrt(1 - alpha_bar) * epsilon_t) / torch.sqrt(alpha_bar)
+		# normalization = transforms.Normalize(mean=x_0_pred.mean(), std=x_0_pred.std())
+		# x_0_pred = normalization(x_0_pred)
+		
 		img = x_0_pred[0][0].cpu().detach().numpy()
 		# x_0_pred = torch.clamp(x_0_pred, min=-1, max=1)
 		
