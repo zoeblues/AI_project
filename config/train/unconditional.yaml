@@ -7,13 +7,16 @@ run_name: run-0
 params:
   timesteps: 1_000
   epochs: 1_000
-  bach_size: 64
+  bach_size: 16
   accum_steps: 1
   device: mps
+  # Additional
+  do-ImportanceSampling: true
   # Dataset & Dataloader
   dataset: ${hydra:runtime.cwd}/data/diffusion_training.csv
   # Additional info, model saving/loading
   save_path: ${hydra:runtime.output_dir}/steps
+  artifact_path: ${hydra:runtime.output_dir}/artifacts
   model_name: uncond_unet
   load_path: outputs/steps
   load_timestep: 0
