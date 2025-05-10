@@ -41,7 +41,7 @@ def main():
 	image = Image.open(path).convert('RGB')
 	
 	scheduler = CosineNoiseScheduler(n_timesteps=1000)
-	test_timesteps = [1, 50, 150, 250, 350, 450, 550, 650, 750, 850, 950, 999]
+	test_timesteps = list(reversed([1, 50, 150, 250, 350, 450, 550, 650, 750, 850, 950, 999]))
 	
 	bgc = Image.new('RGB', (64 * len(test_timesteps), 64 * 2), color='white')
 	

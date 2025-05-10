@@ -24,6 +24,7 @@ def test_denoise(model: UNet, scheduler: NoiseScheduler, img_tensor: torch.Tenso
 	# Change to batch form (shape) -> (1, shape)
 	img_tensor = img_tensor.unsqueeze(0)
 	
+	torch.manual_seed(0)
 	noise = torch.randn_like(img_tensor, device=device)
 	
 	noised_img, noise = scheduler.q_forward(img_tensor, timestep, epsilon=noise)
@@ -71,15 +72,14 @@ def main():
 	
 	scheduler = CosineNoiseScheduler(n_timesteps=1_000, device=device)
 	
-	step = 100
-	
+	steps = list(reversed([1, 100, 200, 300, 400, 500, 600, 700, 800, 900, 999]))
 	n_rows = 3
-	n_columns = 1000//step + 1
+	n_columns = len(steps) + 1
 	
 	bgc = Image.new("RGB", (64 * n_columns, 64 * n_rows), color=(255, 255, 255)).convert("RGB")
 	bgc.paste(image.resize((64, 64)), (0, 0))
 	
-	for t in reversed(list(range(1, 1000, step)) + [999]):
+	for i, t in enumerate(steps):
 		noised_img, noise, pred_noise, _, pred_img = test_denoise(model, scheduler, to_tensor(image), t, device=device)
 		img = pred_img[0].cpu().numpy()
 		img = pred_img[1].cpu().numpy()
@@ -87,7 +87,6 @@ def main():
 		loss = torch.nn.MSELoss()(pred_img, noise)
 		
 		print(t, loss.item())
-		i = (t + 1) // step
 		
 		bgc.paste(to_pil(noised_img), (64 * (i + 1), 0))
 		bgc.paste(to_pil(noise - pred_noise), (64 * (i + 1), 64))
