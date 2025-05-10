@@ -8,7 +8,7 @@ params:
   timesteps: 1_000
   epochs: 1_000
   bach_size: 64
-  accum_steps: 4
+  accum_steps: 1
   device: mps
   # Dataset & Dataloader
   dataset: ${hydra:runtime.cwd}/data/diffusion_training.csv
@@ -18,4 +18,4 @@ params:
   load_path: outputs/steps
   load_timestep: 0
   log_step: 10
-  save_step: 10
+  save_step: 50
