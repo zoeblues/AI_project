@@ -6,7 +6,7 @@ import hydra
 import importlib
 
 import numpy as np
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
 from tqdm import tqdm
 import mlflow
@@ -20,12 +20,14 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from diffusion_lab.datasets.dataset_diffusion import DiffusionDataset
+from diffusion_lab.models.noise_scheduler import NoiseScheduler
 
 log = logging.getLogger(__name__)
 
 
-def warm_up_importance_sampling(model, scheduler, loader, optimizer, n_rounds, backlog_size, timesteps, device):
-	criterion = nn.MSELoss(reduction='none')
+def warm_up_importance_sampling(model, scheduler: NoiseScheduler, loader, optimizer, n_rounds, backlog_size, timesteps, device):
+	criterion = nn.MSELoss()
+	criterion_accuracy = nn.MSELoss(reduction='none')
 	
 	loss_backlog = torch.ones((timesteps, backlog_size), device=device)
 	backlog_ptr = torch.zeros((timesteps,), device=device, dtype=torch.long)
@@ -41,31 +43,34 @@ def warm_up_importance_sampling(model, scheduler, loader, optimizer, n_rounds, b
 			x_t, epsilon = scheduler.q_forward(batch, t)
 			
 			out = model(x_t, t)
-			loss = criterion(out, epsilon).mean(dim=(1, 2, 3))  # (B,)
+			loss = criterion(out, batch)
+			with torch.no_grad():
+				_, x_0 = scheduler.p_backward(x_t, out, t)
+				loss_reconstruction = criterion_accuracy(batch, x_0).mean(dim=(1, 2, 3))  # (B,)
 			
 			# Backprop
 			optimizer.zero_grad()
 			loss.mean().backward()
 			optimizer.step()
 			
-			loss_backlog[t, backlog_ptr[t]] = loss.detach()
+			loss_backlog[t, backlog_ptr[t]] = loss_reconstruction
 			backlog_ptr[t] += 1
 			backlog_ptr[t] %= backlog_size
 			
-			progress_bar.set_postfix(loss=loss.mean().detach().item())
+			progress_bar.set_postfix(loss=loss.detach().item())
 	
 	optimizer.zero_grad()
 	return model, loss_backlog, backlog_ptr
 
 
-def artifact_loss_chart(avg_loss, epoch, save_path="./"):
+def artifact_reconstruction_chart(avg_loss, epoch, save_path="./"):
 	os.makedirs(save_path, exist_ok=True)  # Good practise
 	
 	plt.figure(figsize=(18, 4))
 	plt.bar(np.arange(len(avg_loss)), avg_loss, width=1.0)
 	plt.xlabel("Timestep t")
-	plt.ylabel("Average Loss")
-	plt.title("Per-timestep Average Loss")
+	plt.ylabel("Pick Probability")
+	plt.title("Per-timestep probability")
 	plt.tight_layout()
 	plt.grid(axis='y', linestyle='--', alpha=0.5)
 	
@@ -78,7 +83,8 @@ def artifact_loss_chart(avg_loss, epoch, save_path="./"):
 
 def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 	model = model.to(device)  # to make sure it's on an intended device
-	criterion = nn.MSELoss(reduction='none')
+	criterion = nn.MSELoss()
+	criterion_accuracy = nn.MSELoss(reduction='none')
 	
 	log.info("Starting training...")
 	
@@ -93,12 +99,16 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 		mlflow.log_params(train_cfg.params)
 		
 		backlog_size = 10
+		temperature = 5
 		loss_backlog = torch.ones((timesteps, backlog_size), device=device)
 		backlog_ptr = torch.zeros((timesteps,), device=device, dtype=torch.long)
 		
 		if importance_sampling:
 			model, loss_backlog, backlog_ptr = warm_up_importance_sampling(model, scheduler, loader, optimizer, 5, backlog_size, timesteps, device)
-			artifact_loss_chart(loss_backlog.mean(dim=1).cpu().numpy(), 0, save_path=train_cfg.params.artifact_path)
+			weights = loss_backlog.mean(dim=1)
+			sampling_probs = (weights ** (1.0 / temperature))
+			sampling_probs /= sampling_probs.sum()
+			artifact_reconstruction_chart(sampling_probs.cpu().numpy(), 0, save_path=train_cfg.params.artifact_path)
 		
 		for epoch in range(train_cfg.params.epochs):
 			model.train()
@@ -110,17 +120,26 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 			for i, batch in enumerate(progress_bar):
 				batch = batch.to(device)
 				
+				# Sampling timesteps
 				weights = loss_backlog.mean(dim=1)
-				t = torch.multinomial(weights, batch.shape[0], replacement=True).to(device)
+				sampling_probs = (weights ** (1.0 / temperature))
+				sampling_probs /= sampling_probs.sum()
+				t = torch.multinomial(sampling_probs, batch.shape[0]).to(device)
+				# log.debug(f"Batch {i + 1}/{len(progress_bar)}: t={t}")
+				
 				x_t, epsilon = scheduler.q_forward(batch, t)
 				
 				out = model(x_t, t)
-				loss = criterion(out, epsilon).mean(dim=(1, 2, 3))  # (B,)
-				running_loss += loss.detach().sum().item()
+				loss = criterion(out, epsilon)
+				if importance_sampling:
+					with torch.no_grad():
+						_, x_0 = scheduler.p_backward(x_t, out, t)
+						loss_reconstruction = criterion_accuracy(batch, x_0).mean(dim=(1, 2, 3))  # (B,)
+				running_loss += loss.detach().item() * batch.shape[0]
 				
 				# Importance Sampling Weights Update
 				if importance_sampling:
-					loss_backlog[t, backlog_ptr[t]] = loss.detach()
+					loss_backlog[t, backlog_ptr[t]] = loss_reconstruction.detach()
 					backlog_ptr[t] += 1
 					backlog_ptr[t] %= backlog_size
 				
@@ -128,7 +147,7 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 				loss = loss / train_cfg.params.accum_steps
 				
 				# Backpropagation
-				loss.mean().backward()
+				loss.backward()
 				# Update the network only every N steps
 				if (i + 1) % train_cfg.params.accum_steps == 0:
 					optimizer.step()
@@ -145,13 +164,16 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 			mlflow.log_metric("items_per_sec", it_per_sec, step=epoch)
 			mlflow.log_metric("elapsed", elapsed, step=epoch)
 			if importance_sampling:
-				for t_idx in [0, 200, 400, 600, 800, 999]:
+				for t_idx in [100, 200, 400, 600, 800, 999]:
 					mlflow.log_metric(f"loss_t/{t_idx}", loss_backlog[t_idx].mean().item(), step=epoch)
 
 			if (epoch + 1) % train_cfg.params.log_step == 0:
 				log.info(f"Epoch {epoch + 1}/{train_cfg.params.epochs} Loss: {avg_loss}")
 				if importance_sampling:
-					artifact_loss_chart(loss_backlog.mean(dim=1).cpu().numpy(), epoch+1, save_path=train_cfg.params.artifact_path)
+					weights = loss_backlog.mean(dim=1)
+					sampling_probs = (weights ** (1.0 / temperature))
+					sampling_probs /= sampling_probs.sum()
+					artifact_reconstruction_chart(sampling_probs.cpu().numpy(), epoch + 1, save_path=train_cfg.params.artifact_path)
 			if (epoch + 1) % train_cfg.params.save_step == 0 and epoch != 0:
 				torch.save(model.state_dict(), pjoin(train_cfg.params.save_path, f"step-{epoch + 1}.pth"))
 	

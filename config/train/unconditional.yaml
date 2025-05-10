@@ -7,7 +7,7 @@ run_name: run-0
 params:
   timesteps: 1_000
   epochs: 1_000
-  bach_size: 16
+  bach_size: 64
   accum_steps: 1
   device: mps
   # Additional

@@ -44,7 +44,8 @@ class NoiseScheduler:
 		batch_size = x_t.size(0)
 		t = t.view(-1) if t.ndim == 0 else t
 		
-		z = torch.randn_like(x_t, device=self.device) if t > 1 else torch.zeros_like(x_t, device=self.device)
+		z = torch.randn_like(x_t, device=self.device)
+		z[t == 0] = 0
 		
 		beta_t = self.betas[t].view(batch_size, 1, 1, 1)
 		alpha_t = self.alphas[t].view(batch_size, 1, 1, 1)

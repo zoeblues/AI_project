@@ -12,13 +12,13 @@ handlers:
     stream: ext://sys.stdout
   file:
     class: logging.FileHandler
-    level: INFO 
+    level: DEBUG 
     formatter: simple_log
     filename: ${hydra.runtime.output_dir}/train.log
     mode: a
 
 root:
-  level: INFO 
+  level: DEBUG 
   handlers: [console, file]
 
 disable_existing_loggers: false
