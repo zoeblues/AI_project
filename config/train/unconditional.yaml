@@ -8,10 +8,14 @@ params:
   timesteps: 1_000
   epochs: 1_000
   bach_size: 64
-  accum_steps: 1
   device: mps
   # Additional
-  do-ImportanceSampling: true
+  do-ImportanceSampling: false
+  n_warmup_rounds: 5
+  history_size: 10
+  temperature: 5
+  do-GradientAccumulation: false
+  accum_steps: 1
   # Dataset & Dataloader
   dataset: ${hydra:runtime.cwd}/data/diffusion_training.csv
   # Additional info, model saving/loading

@@ -25,7 +25,8 @@ from diffusion_lab.models.noise_scheduler import NoiseScheduler
 log = logging.getLogger(__name__)
 
 
-def warm_up_importance_sampling(model, scheduler: NoiseScheduler, loader, optimizer, n_rounds, backlog_size, timesteps, device):
+def warm_up_importance_sampling(model, scheduler: NoiseScheduler, loader, optimizer, n_rounds, backlog_size, timesteps,
+                                device):
 	criterion = nn.MSELoss()
 	criterion_accuracy = nn.MSELoss(reduction='none')
 	
@@ -88,25 +89,34 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 	
 	log.info("Starting training...")
 	
-	importance_sampling = train_cfg.params.get("do-ImportanceSampling", False)
-	timesteps = train_cfg.params.timesteps
+	use_importance_sampling = train_cfg.params.get("do-ImportanceSampling", False)
+	use_gradient_accumulation = train_cfg.params.get('do-GradientAccumulation', False)
+	
+	t_max = train_cfg.params.timesteps
 	
 	with mlflow.start_run(run_name=train_cfg.run_name):
 		mlflow.log_param("training", train_cfg.name)
 		mlflow.log_param("optimizer", train_cfg.optimizer.name)
-		mlflow.log_param("importanceSampling", importance_sampling)
+		mlflow.log_param("importanceSampling", use_importance_sampling)
 		mlflow.log_params(train_cfg.optimizer.params)
 		mlflow.log_params(train_cfg.params)
 		
-		backlog_size = 10
-		temperature = 5
-		loss_backlog = torch.ones((timesteps, backlog_size), device=device)
-		backlog_ptr = torch.zeros((timesteps,), device=device, dtype=torch.long)
+		importance_history = torch.ones((t_max, train_cfg.params.history_size), device=device)
+		backlog_ptr = torch.zeros((t_max,), device=device, dtype=torch.long)
 		
-		if importance_sampling:
-			model, loss_backlog, backlog_ptr = warm_up_importance_sampling(model, scheduler, loader, optimizer, 5, backlog_size, timesteps, device)
-			weights = loss_backlog.mean(dim=1)
-			sampling_probs = (weights ** (1.0 / temperature))
+		if use_importance_sampling:
+			model, importance_history, backlog_ptr = warm_up_importance_sampling(
+				model,
+				scheduler,
+				loader,
+				optimizer,
+				train_cfg.params.n_warmup_rounds,
+				train_cfg.params.history_size,
+				t_max,
+				device
+			)
+			weights = importance_history.mean(dim=1)
+			sampling_probs = (weights ** (1.0 / train_cfg.params.temperature))
 			sampling_probs /= sampling_probs.sum()
 			artifact_reconstruction_chart(sampling_probs.cpu().numpy(), 0, save_path=train_cfg.params.artifact_path)
 		
@@ -120,36 +130,37 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 			for i, batch in enumerate(progress_bar):
 				batch = batch.to(device)
 				
-				# Sampling timesteps
-				weights = loss_backlog.mean(dim=1)
-				sampling_probs = (weights ** (1.0 / temperature))
+				# Importance Sampling: Sampling timesteps
+				sampling_probs = (importance_history.mean(dim=1) ** (1.0 / train_cfg.params.temperature))
 				sampling_probs /= sampling_probs.sum()
 				t = torch.multinomial(sampling_probs, batch.shape[0]).to(device)
-				# log.debug(f"Batch {i + 1}/{len(progress_bar)}: t={t}")
 				
+				# Noising the Images
 				x_t, epsilon = scheduler.q_forward(batch, t)
 				
 				out = model(x_t, t)
 				loss = criterion(out, epsilon)
-				if importance_sampling:
+				running_loss += loss.detach().item() * batch.shape[0]
+				# Importance Sampling: Weight calculation
+				if use_importance_sampling:
 					with torch.no_grad():
 						_, x_0 = scheduler.p_backward(x_t, out, t)
 						loss_reconstruction = criterion_accuracy(batch, x_0).mean(dim=(1, 2, 3))  # (B,)
-				running_loss += loss.detach().item() * batch.shape[0]
 				
-				# Importance Sampling Weights Update
-				if importance_sampling:
-					loss_backlog[t, backlog_ptr[t]] = loss_reconstruction.detach()
+				# Importance Sampling: Weights update
+				if use_importance_sampling:
+					importance_history[t, backlog_ptr[t]] = loss_reconstruction.detach()
 					backlog_ptr[t] += 1
-					backlog_ptr[t] %= backlog_size
+					backlog_ptr[t] %= train_cfg.params.history_size
 				
-				# Normalize the loss for gradient accumulation
-				loss = loss / train_cfg.params.accum_steps
+				# Gradient Accumulation: Normalize the loss for
+				if use_gradient_accumulation:
+					loss /= train_cfg.params.accum_steps
 				
 				# Backpropagation
 				loss.backward()
-				# Update the network only every N steps
-				if (i + 1) % train_cfg.params.accum_steps == 0:
+				# Gradient Accumulation: Update the network only every N steps
+				if not use_gradient_accumulation or (i + 1) % train_cfg.params.accum_steps == 0:
 					optimizer.step()
 					optimizer.zero_grad()
 				
@@ -158,22 +169,22 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 			avg_loss = running_loss / len(loader.dataset)
 			elapsed = time.time() - start_time
 			it_per_sec = (len(loader.dataset) + 1) / elapsed
-
+			
 			# ML Flow Logging
 			mlflow.log_metric("avg_loss", avg_loss, step=epoch)
 			mlflow.log_metric("items_per_sec", it_per_sec, step=epoch)
 			mlflow.log_metric("elapsed", elapsed, step=epoch)
-			if importance_sampling:
+			if use_importance_sampling:
 				for t_idx in [100, 200, 400, 600, 800, 999]:
-					mlflow.log_metric(f"loss_t/{t_idx}", loss_backlog[t_idx].mean().item(), step=epoch)
-
+					mlflow.log_metric(f"loss_t/{t_idx}", importance_history[t_idx].mean().item(), step=epoch)
+			
 			if (epoch + 1) % train_cfg.params.log_step == 0:
 				log.info(f"Epoch {epoch + 1}/{train_cfg.params.epochs} Loss: {avg_loss}")
-				if importance_sampling:
-					weights = loss_backlog.mean(dim=1)
-					sampling_probs = (weights ** (1.0 / temperature))
+				if use_importance_sampling:
+					sampling_probs = (importance_history.mean(dim=1) ** (1.0 / train_cfg.params.temperature))
 					sampling_probs /= sampling_probs.sum()
-					artifact_reconstruction_chart(sampling_probs.cpu().numpy(), epoch + 1, save_path=train_cfg.params.artifact_path)
+					artifact_reconstruction_chart(sampling_probs.cpu().numpy(), epoch + 1,
+					                              save_path=train_cfg.params.artifact_path)
 			if (epoch + 1) % train_cfg.params.save_step == 0 and epoch != 0:
 				torch.save(model.state_dict(), pjoin(train_cfg.params.save_path, f"step-{epoch + 1}.pth"))
 	
@@ -217,7 +228,8 @@ def main(cfg: DictConfig):
 	# Dynamic load of noise scheduler
 	sche_path, sche_name = cfg.schedule.type.rsplit(".", maxsplit=1)
 	scheduler_cls = getattr(importlib.import_module(sche_path), sche_name)
-	scheduler = scheduler_cls(**cfg.schedule.params, n_timesteps=cfg.train.params.timesteps, device=cfg.train.params.device)
+	scheduler = scheduler_cls(**cfg.schedule.params, n_timesteps=cfg.train.params.timesteps,
+	                          device=cfg.train.params.device)
 	
 	log.info("Options loaded successfully!")
 	train(model, scheduler, loader, optimizer, cfg.train, device=cfg.train.params.device)
