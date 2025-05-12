@@ -4,6 +4,7 @@ defaults:
 
 name: unconditional
 run_name: run-0
+run_desc: Description of current experiment
 params:
   timesteps: 1_000
   epochs: 500

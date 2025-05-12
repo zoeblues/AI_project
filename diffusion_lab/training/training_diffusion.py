@@ -79,7 +79,6 @@ def artifact_reconstruction_chart(avg_loss, epoch, save_path="./"):
 	plt.close()
 	
 	mlflow.log_artifact(pjoin(save_path, f"timestep_loss-{str(epoch)}.png"))
-	pass
 
 
 def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
@@ -95,9 +94,10 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 	t_max = train_cfg.params.timesteps
 	
 	with mlflow.start_run(run_name=train_cfg.run_name):
+		mlflow.set_tag("mlflow.note.content", train_cfg.run_desc)
+		
 		mlflow.log_param("training", train_cfg.name)
 		mlflow.log_param("optimizer", train_cfg.optimizer.name)
-		mlflow.log_param("importanceSampling", use_importance_sampling)
 		mlflow.log_params(train_cfg.optimizer.params)
 		mlflow.log_params(train_cfg.params)
 		
