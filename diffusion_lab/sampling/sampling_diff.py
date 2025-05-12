@@ -19,7 +19,7 @@ def sample_from_scheduler(model, scheduler: NoiseScheduler, n_timesteps=1000, re
 		transforms.Normalize(mean=[-1.0, -1.0, -1.0], std=[2.0, 2.0, 2.0]),
 		transforms.ToPILImage()
 	])
-	x_img = x_t[0].cpu().clamp(-1, 1)  # Extract single image (C, H, W)
+	x_img = x_t[0].cpu().clamp(-1, 1)
 	return to_pil(x_img)
 
 
@@ -51,7 +51,7 @@ if __name__ == "__main__":
 	x_t_m_1, x_0_pred = scheduler.p_backward(x_t, epsilon_t, timestep)
 
 	# Full sampling
-	sampled_img = sample_from_scheduler(model, scheduler, n_timesteps=900, resolution=resolution, device=device)
+	sampled_img = sample_from_scheduler(model, scheduler, n_timesteps=1000, resolution=resolution, device=device)
 	
 	canvas_width = 128 * 3
 	canvas_height = 128
@@ -60,11 +60,13 @@ if __name__ == "__main__":
 	# Convert tensors to PIL images
 	initial_noise_img = to_pil(x_t[0].cpu().clamp(-1, 1))
 	predicted_x0_img = to_pil(x_0_pred[0].cpu().clamp(-1, 1))
-	final_sampled_img = sampled_img  # already PIL
+	final_sampled_img = sampled_img
 	
+	print("Initial noise min/max:", x_t.min().item(), x_t.max().item())
+	print("Predicted x0 min/max:", x_0_pred.min().item(), x_0_pred.max().item())
 	# Paste them side by side
-	bgc.paste(initial_noise_img, (0, 0))  # First slot
-	bgc.paste(predicted_x0_img, (128, 0))  # Second slot
+	bgc.paste(initial_noise_img, (0, 0))
+	bgc.paste(predicted_x0_img, (128, 0))
 	bgc.paste(final_sampled_img, (256, 0))
 	
 	bgc.show()

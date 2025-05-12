@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-
+from diffusion import UNet
 
 class NoiseScheduler:
 	"""
@@ -39,19 +39,36 @@ class NoiseScheduler:
 		return x_t, epsilon
 	
 	def p_backward(self, x_t, epsilon_t, t):
-		z = torch.randn_like(x_t, device=self.device) if t > 1 else torch.zeros_like(x_t, device=self.device)
 		
+		if t.ndim == 0:
+			t = t.expand(x_t.size(0))
+		elif t.ndim == 1 and t.size(0) == 1:
+			t = t.expand(x_t.size(0))
+		
+		z = torch.randn_like(x_t, device=self.device)
+		z = torch.where((t > 0)[:, None, None, None], z, torch.zeros_like(z))
+	
 		beta_t = self.betas[t][:, None, None, None]
 		alpha_t = self.alphas[t][:, None, None, None]
-		alpha_bar = self.alpha_bars[t][:, None, None, None]
+		alpha_bar_t = self.alpha_bars[t][:, None, None, None]
 		
-		x_t_minus_one = (x_t - (1 - alpha_t) / torch.sqrt(1 - alpha_bar) * epsilon_t) / torch.sqrt(alpha_t)
+		#x_t_minus_one = (x_t - (1 - alpha_t) / torch.sqrt(1 - alpha_bar) * epsilon_t) / torch.sqrt(alpha_t)
 		# x_t_minus_one = torch.clamp(x_t_minus_one, -1.0, 1.0)
 		
-		pred_x_0 = (x_t - (1 - alpha_bar) / torch.sqrt(1 - alpha_bar) * epsilon_t) / torch.sqrt(alpha_t)
+		#pred_x_0 = (x_t - (1 - alpha_bar) / torch.sqrt(1 - alpha_bar) * epsilon_t) / torch.sqrt(alpha_t)
 		# pred_x_0 = torch.clamp(pred_x_0, -1.0, 1.0)
+		x_0_pred = (x_t - torch.sqrt(1 - alpha_bar_t) * epsilon_t) / torch.sqrt(alpha_bar_t)
 		
-		return x_t_minus_one + torch.sqrt(beta_t) * z, pred_x_0
+		# Step 2: Estimate mean of p(x_{t-1} | x_t)
+		mean = (1 / torch.sqrt(alpha_t)) * (
+				x_t - ((1 - alpha_t) / torch.sqrt(1 - alpha_bar_t)) * epsilon_t
+		)
+		
+		# Step 3: Add noise
+		x_t_minus_1 = mean + torch.sqrt(beta_t) * z if t[0] > 0 else mean
+		
+		#return x_t_minus_one + torch.sqrt(beta_t) * z, pred_x_0
+		return x_t_minus_1, x_0_pred
 
 
 class CosineNoiseScheduler(NoiseScheduler):
@@ -76,7 +93,7 @@ class CosineNoiseScheduler(NoiseScheduler):
 		
 		self.betas = betas
 		self.alphas = alphas
-		self.alpha_bars = alphas_bar
+		self.alpha_bars = alpha_bars
 		
 
 class LinearNoiseScheduler(NoiseScheduler):
@@ -96,12 +113,17 @@ class LinearNoiseScheduler(NoiseScheduler):
 if __name__ == "__main__":
 	from PIL import Image
 	from torchvision import transforms
+	from omegaconf import DictConfig, OmegaConf
 	
 	path = '../data/resized_images/Cat/cat-test_(1).jpeg'
 	image = Image.open(path).convert('RGB')
+	cfg = OmegaConf.load("../../config/model/unet.yaml")
+	model = UNet(cfg, device='cpu')
+	model.load_state_dict(torch.load('../sampling/outputs/uncond_unet.pth'))
+	model.eval()
 	
 	train_transformation = transforms.Compose([
-		transforms.Resize(64),
+		transforms.Resize(128),
 		# transforms.RandomResizedCrop((256, 256), scale=(0.8, 1.0), ratio=(0.9, 1.2)),
 		# transforms.RandomHorizontalFlip(p=0.5),
 		transforms.ToTensor(),  # Convert image to tensor
@@ -118,7 +140,7 @@ if __name__ == "__main__":
 		transforms.ToPILImage(),
 	])
 	
-	bgc = Image.new('RGB', (64 * 11, 64 * 2), color='white')
+	bgc = Image.new('RGB', (128 * 11, 128 * 2), color='white')
 	
 	scheduler = CosineNoiseScheduler()
 	
@@ -129,12 +151,13 @@ if __name__ == "__main__":
 	
 	for t in range(0, 1000, 100):
 		# t = 600
+		t_batch = torch.full((1,), t, dtype=torch.long, device=scheduler.device)
 		
-		x_t, epsilon = scheduler.q_forward(x_0, torch.tensor([t]))
-		bgc.paste(to_pil(x_t[0]), (64 + 64*(t//100), 0))
+		x_t, epsilon = scheduler.q_forward(x_0, t_batch)
+		bgc.paste(to_pil(x_t[0].clamp(-1, 1)), (128 + 128 * (t // 100), 0))
 		
-		_, x_0_pred = scheduler.p_backward(x_t, epsilon, torch.tensor([t]))
-		bgc.paste(to_pil(x_0_pred[0]), (64 + 64*(t//100), 64))
-		
+		predicted_epsilon = model(x_t, torch.tensor([t], device='cpu'))
+		_, x_0_pred = scheduler.p_backward(x_t, predicted_epsilon, torch.tensor([t]))
+		bgc.paste(to_pil(x_0_pred[0].clamp(-1, 1)), (128 + 128 * (t // 100), 128))
 	bgc.show()
 	

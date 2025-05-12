@@ -1,8 +1,8 @@
 import torch
 import os
 from diffusion_lab.models.diffusion import UNet
-from diffusion_lab.models.noise_scheduler import NoiseScheduler
-from diffusion_lab.sampling.sampling_diff import sample_plots
+from diffusion_lab.models.noise_scheduler import CosineNoiseScheduler
+
 # 1. Set device
 device = "cpu"
 
@@ -31,12 +31,3 @@ model.eval()
 
 # 5. Cosine your scheduler
 scheduler = CosineNoiseScheduler(1000, device=model.device)
-# 6. Call sample_plots
-sample_plots(
-    model=model,
-    scheduler=scheduler,
-    image_size=64,       # 128x128 resolution
-    n_samples=1,         # generate 1 sample
-    save_dir=save_dir,
-    device=device
-)

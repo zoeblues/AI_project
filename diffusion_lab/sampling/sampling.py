@@ -26,7 +26,7 @@ if __name__ == '__main__':
 	from torchvision.transforms import transforms
 	from PIL import Image
 	
-	# todo: use unet config
+	
 	'''
 		cfg = DictConfig({
 		'base_channels': 128,

@@ -38,12 +38,12 @@ class DiffusionDataset(Dataset):
 
 
 if __name__ == '__main__':
-	path = 'data/resized_images/Cat/cat-test_(1).jpeg'
+	path = '../data/resized_images/Cat/cat-test_(1).jpeg'
 	image = Image.open(path).convert('RGB')
 	
 	train_transformation = transforms.Compose([
 		# transforms.Resize(128),
-		transforms.RandomResizedCrop((256, 256), scale=(0.8, 1.0), ratio=(0.9, 1.2)),
+		transforms.RandomResizedCrop((128, 128), scale=(0.8, 1.0), ratio=(0.9, 1.2)),
 		transforms.RandomHorizontalFlip(p=0.5),
 		# transforms.ToTensor(),  # Convert image to tensor
 		# transforms.Normalize(  # Normalize RGB pixel values: [0, 255] -> [-1, 1]
@@ -52,7 +52,7 @@ if __name__ == '__main__':
 		# )
 	])
 	
-	img_size = 256
+	img_size = 128
 	n_examples = 4
 	
 	grid_img = Image.new('RGB', (img_size * (n_examples + 1), img_size), color='white')
