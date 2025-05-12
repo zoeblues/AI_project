@@ -17,7 +17,7 @@ params:
   do-GradientAccumulation: false
   accum_steps: 1
   # Dataset & Dataloader
-  dataset: ${hydra:runtime.cwd}/data/diffusion_training.csv
+  dataset: ${hydra:runtime.cwd}/data/training-mini.csv
   # Additional info, model saving/loading
   save_path: ${hydra:runtime.output_dir}/steps
   artifact_path: ${hydra:runtime.output_dir}/artifacts
