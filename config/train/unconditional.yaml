@@ -6,8 +6,8 @@ name: unconditional
 run_name: run-0
 params:
   timesteps: 1_000
-  epochs: 1_000
-  bach_size: 64
+  epochs: 500
+  bach_size: 12
   device: mps
   # Additional
   do-ImportanceSampling: false
@@ -24,5 +24,5 @@ params:
   model_name: uncond_unet
   load_path: outputs/steps
   load_timestep: 0
-  log_step: 10
-  save_step: 50
+  log_step: 1
+  save_step: 10

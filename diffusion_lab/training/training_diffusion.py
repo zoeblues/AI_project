@@ -213,7 +213,7 @@ def main(cfg: DictConfig):
 	# Loading model dynamically, based on config.
 	model_path, model_name = cfg.model.type.rsplit(".", maxsplit=1)  # get module path, and class name
 	model_cls = getattr(importlib.import_module(model_path), model_name)  # dynamic load a given class from a library
-	model = model_cls(cfg.model, device=cfg.train.params.device)  # create an instance, with params from config
+	model = model_cls(**cfg.model.params, device=cfg.train.params.device)  # create an instance, with params from config
 	# Loading already trained model weights, if specified in the config (load_timestep != 0)
 	if cfg.train.params.load_timestep != 0 and 'load_path' in cfg.train.params and 'load_timestep' in cfg.train.params:
 		model.load_state_dict(torch.load(pjoin(cfg.train.params.load_path, f"{cfg.train.params.load_timestep}.pth")))
