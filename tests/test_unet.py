@@ -2,9 +2,12 @@ import importlib
 import math
 
 import hydra
+import numpy as np
 import torch
 from PIL import Image
+from matplotlib import pyplot as plt
 from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
 
 # from diffusion_lab.models.diffusion import UNet
 from diffusion_lab.models.unet import UNet
@@ -62,6 +65,42 @@ def main(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test
 	bgc.show()
 
 
+@torch.no_grad()
+def plot_timestep_loss(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test.jpg', device='cpu', **kwargs):
+	model.load_state_dict(torch.load(model_abs_path, map_location=device))
+	model.to(device)
+	model.eval()
+	
+	image = Image.open(test_img_path).convert('RGB')
+	img_tensor = to_tensor(image).to(device).unsqueeze(0)
+	
+	torch.manual_seed(0)
+	noise = torch.randn_like(img_tensor, device=device)
+	
+	losses = np.zeros((scheduler.T,))
+	pbar = tqdm(total=scheduler.T)
+	for t in reversed(range(1, scheduler.T)):
+		t_tensor = torch.tensor([t], device=device)
+		
+		noised_img, noise = scheduler.q_forward(img_tensor, t_tensor, epsilon=noise)
+		pred = model(noised_img, t_tensor)
+		
+		loss = torch.nn.MSELoss()(pred, noise).detach().item()
+		losses[t] = float(loss)
+		
+		pbar.update(1)
+	pbar.close()
+	
+	x = np.linspace(scheduler.T - 1, 0, scheduler.T)
+	plt.plot(x, losses, label='Line Std')
+	
+	plt.xlabel('Diffusion Step')
+	plt.ylabel('Loss')
+	plt.title('Noise prediction Loss, per Diffusion step')
+	
+	plt.show()
+
+
 @hydra.main(config_path="../config", config_name="diffusion", version_base="1.3")
 def load_run(cfg: DictConfig):
 	model_path, model_name = cfg.model.type.rsplit(".", maxsplit=1)
@@ -73,6 +112,7 @@ def load_run(cfg: DictConfig):
 	scheduler = scheduler_cls(**cfg.schedule.params)
 	
 	main(model, scheduler, **cfg.tests.params)
+	plot_timestep_loss(model, scheduler, **cfg.tests.params)
 
 
 if __name__ == '__main__':
