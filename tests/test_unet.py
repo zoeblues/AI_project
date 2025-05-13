@@ -26,8 +26,7 @@ def test_denoise(model: UNet, scheduler: NoiseScheduler, img_tensor: torch.Tenso
 	
 	noised_img, noise = scheduler.q_forward(img_tensor, timestep, epsilon=noise)
 	# img = noise[0][0].cpu().numpy()
-	# img = noise[0][1].cpu().numpy()
-	# img = noised_img[0][2].cpu().numpy()
+	# img = noised_img[0][0].cpu().numpy()
 	
 	pred = model(noised_img, timestep)
 	less_noised_img, clear_img = scheduler.p_backward(noised_img, pred, timestep)

@@ -12,3 +12,4 @@ project:
 run:
   device: mps
   timesteps: 1_000
+  img_size: 64

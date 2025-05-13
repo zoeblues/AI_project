@@ -3,6 +3,7 @@ import importlib
 import hydra
 import torch
 from PIL import Image
+from matplotlib import pyplot as plt
 from omegaconf import DictConfig
 
 from diffusion_lab.models.noise_scheduler import NoiseScheduler
@@ -25,6 +26,31 @@ def test_schedule(scheduler: NoiseScheduler, image, t):
 	return to_pil(x_t[0]), to_pil(x_prev[0]), to_pil(x_0_pred[0])
 
 
+@torch.no_grad()
+def plot_step_mean_std(scheduler: NoiseScheduler, image):
+	img_tensor = to_tensor(image)
+	img_tensor = img_tensor.to(scheduler.device)
+	img_tensor = img_tensor.unsqueeze(0)
+	img_tensor = img_tensor.repeat(scheduler.T, 1, 1, 1)
+	
+	t = torch.arange(scheduler.T, device=scheduler.device)
+	
+	x_t, _ = scheduler.q_forward(img_tensor, t)
+	mean = x_t.mean(dim=(1, 2, 3)).cpu().numpy()
+	std = x_t.std(dim=(1, 2, 3)).cpu().numpy()
+	
+	x = t.cpu().numpy()
+	plt.plot(x, mean, label='Line Mean')
+	plt.plot(x, std, label='Line Std')
+	
+	plt.xlabel('Diffusion Step')
+	plt.ylabel('Y-axis')
+	plt.title('Mean and Std by Diffusion Step')
+	
+	plt.legend()
+	plt.show()
+
+
 def main(scheduler, test_img_path='test.jpg', show_steps=None, **kwargs):
 	if show_steps is None:
 		show_steps = [1, 500, 999]
@@ -39,6 +65,8 @@ def main(scheduler, test_img_path='test.jpg', show_steps=None, **kwargs):
 		
 		bgc.paste(noised_img, (64 * i, 0))
 		bgc.paste(x_0_approx, (64 * i, 64))
+	
+	plot_step_mean_std(scheduler, image)
 	
 	bgc.show()
 

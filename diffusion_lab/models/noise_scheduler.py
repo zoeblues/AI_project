@@ -54,8 +54,12 @@ class NoiseScheduler:
 		
 		x_0_pred = (x_t - torch.sqrt(1 - alpha_bar) * epsilon_t) / torch.sqrt(alpha_bar)
 		
-		img = x_0_pred[0][0].cpu().detach().numpy()
+		test = x_0_pred[0][0].cpu().detach().numpy()
 		# x_0_pred = torch.clamp(x_0_pred, min=-1, max=1)
+		
+		# normalization = transforms.Normalize(mean=x_0_pred.mean(), std=x_0_pred.std())
+		# x_0_pred = normalization(x_0_pred)
+		# test = x_0_pred[0][0].cpu().detach().numpy()
 		
 		x_t_prev = torch.sqrt(alpha_bar_tm1) * x_0_pred + torch.sqrt(1 - alpha_bar_tm1) * z
 		# x_t_prev = (1 / torch.sqrt(alpha_t)) * (x_t - (1 - alpha_t) / (torch.sqrt(alpha_bar)) * epsilon_t) + torch.sqrt(1-alpha_t) * z

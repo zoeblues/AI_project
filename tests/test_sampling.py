@@ -1,9 +1,14 @@
+import importlib
+
 import hydra
+import numpy as np
+import matplotlib.pyplot as plt
 
 from diffusion_lab.models.noise_scheduler import CosineNoiseScheduler, LinearNoiseScheduler, NoiseScheduler
 # from diffusion_lab.models.diffusion import UNet
 from diffusion_lab.models.unet import UNet
 from diffusion_lab.sampling.sampling import sample_image
+from diffusion_lab.utils.transforms import to_pil
 
 from omegaconf import DictConfig, OmegaConf
 from torchvision.transforms import transforms
@@ -13,59 +18,66 @@ import torch
 
 
 @torch.no_grad()
-def test_sampling(model, scheduler: NoiseScheduler, n_timesteps=1_000, n_images=1, resolution=(64, 64), start_noise=None):
+def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', show_steps=None, n_images=1, resolution=(64, 64), start_noise=None, device='cpu', **kwargs):
+	if show_steps is None:
+		show_steps = [1, 500, 999]
+	
+	model.load_state_dict(torch.load(model_abs_path, map_location=device))
+	model.to(device)
 	model.eval()
+	
 	x_t = torch.randn((n_images, 3, *resolution), device=model.device)  # B, C, W, H
 	if start_noise is not None:
 		x_t = start_noise
 	
-	for t in reversed(range(1, n_timesteps)):
+	line_mean = np.zeros((scheduler.T-1,), dtype=float)
+	line_std = np.zeros((scheduler.T-1,))
+	
+	n_columns = len(show_steps)
+	bgc = Image.new("RGB", (64 * n_columns, 64 * 2), color=(255, 255, 255)).convert("RGB")
+	for t in reversed(range(1, scheduler.T)):
 		t_tensor = torch.full((n_images,), t, device=model.device, dtype=torch.long)
 		epsilon = model(x_t, t_tensor)
-		x_t, _ = scheduler.p_backward(x_t, epsilon, t_tensor)
-	return x_t
-
-
-@hydra.main(config_path="../../config", config_name="diffusion", version_base="1.3")
-def main():
-	# DO NOT CHANGE! Read comment on the bottom!
-	cfg = OmegaConf.load("config/model/unet.yaml")
-	# DO NOT CHANGE! Read comment on the bottom! 9
-	path = 'data/resized_images/Cat/cat-test_(1).jpeg'
-	img = Image.open(path).convert('RGB')
-	
-	device = 'mps'
-	# model = UNet(cfg=cfg, device=device)
-	model = UNet(device=device)
-	# model.load_state_dict(torch.load("/Volumes/Filip'sTech/outputs/2025-05-09/00-36-26/steps/step-350.pth", map_location=device))
-	model.load_state_dict(torch.load("/Volumes/Filip'sTech/step-110.pth", map_location=device))
-	model.to(device)
-	model.eval()
-	
-	img = to_tensor(img)
-	img = img.to(device)
-	img.unsqueeze(0)
-	
-	# for name, param in model.state_dict().items():
-	# 	print(name, param.shape)
-	
-	with torch.no_grad():
-		scheduler = CosineNoiseScheduler(n_timesteps=1_000, device=device)
-		noise = torch.randn_like(img, device=device)
-		x_t, _ = scheduler.q_forward(img, torch.tensor([999]), epsilon=noise)
+		x_t, x_0 = scheduler.p_backward(x_t, epsilon, t_tensor)
+		# test = x_t.detach().cpu().numpy()
 		
-		epsilon_t = model(x_t, torch.tensor([999], device=model.device))
-		x_t_m_1, x_0 = scheduler.p_backward(x_t, epsilon_t, torch.tensor([999]))
+		# Some info
+		mean = float(x_t.mean().item())
+		std = float(x_t.std().item())
+		print(f"Step {t}: mean={mean:.3f}, std={std:.3f}")
+		line_mean[scheduler.T - t - 1] = mean
+		line_std[scheduler.T - t - 1] = std
 		
-		bgc = Image.new('RGB', (64 * 3, 64), color='white')
-		
-		bgc.paste(to_pil(x_t[0]), (0, 0))
-		bgc.paste(to_pil(x_0[0]), (64, 0))
-		
-		sampled = sample_image(model, scheduler, n_timesteps=1_000, n_images=1, resolution=(64, 64))
-		bgc.paste(to_pil(sampled[0]), (128, 0))
+		if t in show_steps:
+			bgc.paste(to_pil(x_t[0]), (64 * show_steps.index(t), 0))
+			bgc.paste(to_pil(x_0[0]), (64 * show_steps.index(t), 64))
+	
+	x = np.linspace(scheduler.T-2, 0, scheduler.T-1)
+	plt.plot(x, line_mean, label='Line Mean')
+	plt.plot(x, line_std, label='Line Std')
+	
+	plt.xlabel('Diffusion Step')
+	plt.ylabel('Y-axis')
+	plt.title('Mean and Std by Diffusion Step')
+	
+	plt.legend()
+	plt.show()
+	
 	bgc.show()
 
 
+@hydra.main(config_path="../config", config_name="diffusion", version_base="1.3")
+def load_run(cfg: DictConfig):
+	model_path, model_name = cfg.model.type.rsplit(".", maxsplit=1)
+	model_cls = getattr(importlib.import_module(model_path), model_name)
+	model = model_cls(**cfg.model.params)
+	
+	sche_path, sche_name = cfg.schedule.type.rsplit(".", maxsplit=1)
+	scheduler_cls = getattr(importlib.import_module(sche_path), sche_name)
+	scheduler = scheduler_cls(**cfg.schedule.params)
+	
+	main(model, scheduler, resolution=(cfg.run.img_size, cfg.run.img_size), **cfg.tests.params)
+
+
 if __name__ == '__main__':
-	main()
+	load_run()
