@@ -1,45 +1,59 @@
+import importlib
+
+import hydra
 import torch
 from PIL import Image
-from torchvision import transforms
+from omegaconf import DictConfig
 
-from diffusion_lab.models.noise_scheduler import NoiseScheduler, CosineNoiseScheduler
+from diffusion_lab.models.noise_scheduler import NoiseScheduler
+from diffusion_lab.utils.transforms import to_pil, to_tensor
 
 
 def test_schedule(scheduler: NoiseScheduler, image, t):
 	x_0 = to_tensor(image)
+	x_0 = x_0.to(scheduler.device)
 	x_0 = x_0.unsqueeze(0)
+	
+	t = torch.tensor([t], device=scheduler.device)
 	
 	torch.manual_seed(0)
 	noise = torch.randn(x_0.shape, device=scheduler.device)
 	
-	x_t, _ = scheduler.q_forward(x_0, torch.tensor([t]), epsilon=noise)
-	x_prev, x_0_pred = scheduler.p_backward(x_t, noise, torch.tensor([t]))
+	x_t, _ = scheduler.q_forward(x_0, t, epsilon=noise)
+	x_prev, x_0_pred = scheduler.p_backward(x_t, noise, t)
 	
 	return to_pil(x_t[0]), to_pil(x_prev[0]), to_pil(x_0_pred[0])
 
 
-def main():
-	# DO NOT CHANGE!
-	path = 'data/resized_images/Cat/cat-test_(1).jpeg'
-	image = Image.open(path).convert('RGB')
+def main(scheduler, test_img_path='test.jpg', show_steps=None, **kwargs):
+	if show_steps is None:
+		show_steps = [1, 500, 999]
 	
-	scheduler = CosineNoiseScheduler(n_timesteps=1000)
-	test_timesteps = list(reversed([1, 50, 150, 250, 350, 450, 550, 650, 750, 850, 950, 999]))
+	image = Image.open(test_img_path).convert('RGB')
 	
-	bgc = Image.new('RGB', (64 * len(test_timesteps), 64 * 2), color='white')
+	n_cols = len(show_steps)
 	
-	for i, t in enumerate(test_timesteps):
+	bgc = Image.new('RGB', (64 * n_cols, 64 * 2), color='white')
+	for i, t in enumerate(show_steps):
 		noised_img, _, x_0_approx = test_schedule(scheduler, image, t)
 		
 		bgc.paste(noised_img, (64 * i, 0))
 		bgc.paste(x_0_approx, (64 * i, 64))
-		# bgc.paste(to_pil(x_prev[0]), (64 * i, 128))
 	
 	bgc.show()
 
 
+@hydra.main(config_path="../config", config_name="diffusion", version_base="1.3")
+def load_run(cfg: DictConfig):
+	sche_path, sche_name = cfg.schedule.type.rsplit(".", maxsplit=1)
+	scheduler_cls = getattr(importlib.import_module(sche_path), sche_name)
+	scheduler = scheduler_cls(**cfg.schedule.params)
+	
+	main(scheduler, **cfg.tests.params)
+	
+
 if __name__ == '__main__':
 	# !!! Remember to set your working dir to the main project dir
-	main()
+	load_run()
 
 
