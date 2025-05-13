@@ -122,7 +122,6 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 		
 		for epoch in range(train_cfg.params.epochs):
 			model.train()
-			optimizer.zero_grad()
 			
 			running_loss = 0.0
 			start_time = time.time()
@@ -131,9 +130,12 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 				batch = batch.to(device)
 				
 				# Importance Sampling: Sampling timesteps
-				sampling_probs = (importance_history.mean(dim=1) ** (1.0 / train_cfg.params.temperature))
-				sampling_probs /= sampling_probs.sum()
-				t = torch.multinomial(sampling_probs, batch.shape[0]).to(device)
+				if use_importance_sampling:
+					sampling_probs = (importance_history.mean(dim=1) ** (1.0 / train_cfg.params.temperature))
+					sampling_probs /= sampling_probs.sum()
+					t = torch.multinomial(sampling_probs, batch.shape[0]).to(device)
+				else:
+					t = torch.randint(1, scheduler.T, size=(batch.shape[0],), device=device)
 				
 				# Noising the Images
 				x_t, epsilon = scheduler.q_forward(batch, t)
@@ -141,17 +143,6 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 				out = model(x_t, t)
 				loss = criterion(out, epsilon)
 				running_loss += loss.detach().item() * batch.shape[0]
-				# Importance Sampling: Weight calculation
-				if use_importance_sampling:
-					with torch.no_grad():
-						_, x_0 = scheduler.p_backward(x_t, out, t)
-						loss_reconstruction = criterion_accuracy(batch, x_0).mean(dim=(1, 2, 3))  # (B,)
-				
-				# Importance Sampling: Weights update
-				if use_importance_sampling:
-					importance_history[t, backlog_ptr[t]] = loss_reconstruction.detach()
-					backlog_ptr[t] += 1
-					backlog_ptr[t] %= train_cfg.params.history_size
 				
 				# Gradient Accumulation: Normalize the loss for
 				if use_gradient_accumulation:
@@ -163,8 +154,18 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 				if not use_gradient_accumulation or (i + 1) % train_cfg.params.accum_steps == 0:
 					optimizer.step()
 					optimizer.zero_grad()
+					
+				# Importance Sampling: Weight calculation, update
+				if use_importance_sampling:
+					with torch.no_grad():
+						_, x_0 = scheduler.p_backward(x_t, out, t)
+						loss_reconstruction = criterion_accuracy(batch, x_0).mean(dim=(1, 2, 3))  # (B,)
+					
+					importance_history[t, backlog_ptr[t]] = loss_reconstruction.detach()
+					backlog_ptr[t] += 1
+					backlog_ptr[t] %= train_cfg.params.history_size
 				
-				progress_bar.set_postfix(loss=loss.mean().detach().item())
+				progress_bar.set_postfix(loss=loss.detach().item())
 			
 			avg_loss = running_loss / len(loader.dataset)
 			elapsed = time.time() - start_time
@@ -213,7 +214,7 @@ def main(cfg: DictConfig):
 	# Loading model dynamically, based on config.
 	model_path, model_name = cfg.model.type.rsplit(".", maxsplit=1)  # get module path, and class name
 	model_cls = getattr(importlib.import_module(model_path), model_name)  # dynamic load a given class from a library
-	model = model_cls(**cfg.model.params, device=cfg.train.params.device)  # create an instance, with params from config
+	model = model_cls(**cfg.model.params)  # create an instance, with params from config
 	# Loading already trained model weights, if specified in the config (load_timestep != 0)
 	if cfg.train.params.load_timestep != 0 and 'load_path' in cfg.train.params and 'load_timestep' in cfg.train.params:
 		model.load_state_dict(torch.load(pjoin(cfg.train.params.load_path, f"{cfg.train.params.load_timestep}.pth")))
@@ -228,8 +229,7 @@ def main(cfg: DictConfig):
 	# Dynamic load of noise scheduler
 	sche_path, sche_name = cfg.schedule.type.rsplit(".", maxsplit=1)
 	scheduler_cls = getattr(importlib.import_module(sche_path), sche_name)
-	scheduler = scheduler_cls(**cfg.schedule.params, n_timesteps=cfg.train.params.timesteps,
-	                          device=cfg.train.params.device)
+	scheduler = scheduler_cls(**cfg.schedule.params)
 	
 	log.info("Options loaded successfully!")
 	train(model, scheduler, loader, optimizer, cfg.train, device=cfg.train.params.device)
