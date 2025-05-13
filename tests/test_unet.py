@@ -35,7 +35,7 @@ def test_denoise(model: UNet, scheduler: NoiseScheduler, img_tensor: torch.Tenso
 	return noised_img[0], noise[0], pred[0], less_noised_img[0], clear_img[0]
 
 
-def main(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test.jpg', show_steps=None, device='cpu'):
+def main(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test.jpg', show_steps=None, device='cpu', **kwargs):
 	if show_steps is None:
 		show_steps = [1, 500, 999]
 	
@@ -51,12 +51,10 @@ def main(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test
 	bgc = Image.new("RGB", (64 * n_columns, 64 * n_rows), color=(255, 255, 255)).convert("RGB")
 	for i, t in enumerate(show_steps):
 		noised_img, noise, pred_noise, _, pred_img = test_denoise(model, scheduler, to_tensor(image), t, device=device)
-		img = pred_img[0].cpu().numpy()
-		img = pred_img[1].cpu().numpy()
-		img = pred_img[2].cpu().numpy()
+		# img = pred_img[0].cpu().numpy()
 		
-		loss = torch.nn.MSELoss()(pred_img, noise)
-		print(t, loss.item())
+		loss = torch.nn.MSELoss()(pred_img, noise).item()
+		print(f"Step {t}: loss = {loss:.2f}, mean: {noise.mean():.2f}, std: {noise.std():.2f}")
 		
 		bgc.paste(to_pil(noised_img), (64 * i, 0))
 		bgc.paste(to_pil(noise - pred_noise), (64 * i, 64))
