@@ -1,0 +1,8 @@
+params:
+  # Load Model
+  model_abs_path: /Volumes/Filip'sTech/outputs/2025-05-12/22-41-48/steps/step-500.pth
+  # Showcasing
+  test_img_path: data/resized_images/Cat/cat-test_(1).jpeg
+  show_steps: [1, 100, 200, 300, 400, 500, 600, 700, 800, 900, 999]
+  # Device
+  device: ${run.device}

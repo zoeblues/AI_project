@@ -5,23 +5,6 @@ from torchvision import transforms
 from diffusion_lab.models.noise_scheduler import NoiseScheduler, CosineNoiseScheduler
 
 
-to_tensor = transforms.Compose([
-	transforms.Resize(64),
-	transforms.ToTensor(),  # Convert image to tensor
-	transforms.Normalize(  # Normalize RGB pixel values: [0, 1] -> [-1, 1]
-		mean=[0.5, 0.5, 0.5],
-		std=[0.5, 0.5, 0.5]
-	)
-])
-to_pil = transforms.Compose([
-	transforms.Normalize(  # Normalize RGB pixel values: [-1, 1] -> [0, 1]
-		mean=[-1.0, -1.0, -1.0],
-		std=[2.0, 2.0, 2.0]
-	),
-	transforms.ToPILImage(),
-])
-
-
 def test_schedule(scheduler: NoiseScheduler, image, t):
 	x_0 = to_tensor(image)
 	x_0 = x_0.unsqueeze(0)

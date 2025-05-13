@@ -2,7 +2,13 @@ defaults:
   - model: unet
   - schedule: linear
   - train: unconditional
+  - tests: unconditional
+  - _self_
   - override hydra/job_logging: custom
 
 project:
   name: unconditional-diffusion
+
+run:
+  device: mps
+  timesteps: 1_000
