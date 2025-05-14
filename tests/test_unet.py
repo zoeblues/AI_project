@@ -37,7 +37,8 @@ def test_denoise(model: UNet, scheduler: NoiseScheduler, img_tensor: torch.Tenso
 	return noised_img[0], noise[0], pred[0], less_noised_img[0], clear_img[0]
 
 
-def main(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test.jpg', show_steps=None, device='cpu', **kwargs):
+def main(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test.jpg', show_steps=None, device='cpu',
+         **kwargs):
 	if show_steps is None:
 		show_steps = [1, 500, 999]
 	
@@ -55,8 +56,8 @@ def main(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test
 		noised_img, noise, pred_noise, _, pred_img = test_denoise(model, scheduler, to_tensor(image), t, device=device)
 		# img = pred_img[0].cpu().numpy()
 		
-		loss = torch.nn.MSELoss()(pred_img, noise).item()
-		print(f"Step {t}: loss = {loss:.2f}, mean: {noise.mean():.2f}, std: {noise.std():.2f}")
+		loss = torch.nn.MSELoss()(pred_noise, noise).item()
+		print(f"Step {t}: loss = {loss:.4f}, mean: {noise.mean():.2f}, std: {noise.std():.2f}")
 		
 		bgc.paste(to_pil(noised_img), (64 * i, 0))
 		bgc.paste(to_pil(noise - pred_noise), (64 * i, 64))
@@ -66,7 +67,8 @@ def main(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test
 
 
 @torch.no_grad()
-def plot_timestep_loss(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test.jpg', device='cpu', **kwargs):
+def plot_timestep_loss(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test.jpg', device='cpu',
+                       **kwargs):
 	model.load_state_dict(torch.load(model_abs_path, map_location=device))
 	model.to(device)
 	model.eval()
@@ -77,21 +79,21 @@ def plot_timestep_loss(model, scheduler, model_abs_path='steps/final.pth', test_
 	torch.manual_seed(0)
 	noise = torch.randn_like(img_tensor, device=device)
 	
-	losses = np.zeros((scheduler.T,))
+	losses = np.zeros((scheduler.T - 1,))
 	pbar = tqdm(total=scheduler.T)
-	for t in reversed(range(1, scheduler.T)):
+	for t in range(1, scheduler.T):
 		t_tensor = torch.tensor([t], device=device)
 		
 		noised_img, noise = scheduler.q_forward(img_tensor, t_tensor, epsilon=noise)
 		pred = model(noised_img, t_tensor)
 		
 		loss = torch.nn.MSELoss()(pred, noise).detach().item()
-		losses[t] = float(loss)
+		losses[t - 1] = float(loss)
 		
 		pbar.update(1)
 	pbar.close()
 	
-	x = np.linspace(scheduler.T - 1, 0, scheduler.T)
+	x = np.linspace(1, scheduler.T - 1, scheduler.T - 1)
 	plt.plot(x, losses, label='Line Std')
 	
 	plt.xlabel('Diffusion Step')

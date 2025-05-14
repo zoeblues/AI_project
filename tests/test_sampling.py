@@ -3,6 +3,7 @@ import importlib
 import hydra
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from diffusion_lab.models.noise_scheduler import CosineNoiseScheduler, LinearNoiseScheduler, NoiseScheduler
 # from diffusion_lab.models.diffusion import UNet
@@ -35,6 +36,7 @@ def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', sho
 	
 	n_columns = len(show_steps)
 	bgc = Image.new("RGB", (64 * n_columns, 64 * 2), color=(255, 255, 255)).convert("RGB")
+	pbar = tqdm(total=scheduler.T - 1)
 	for t in reversed(range(1, scheduler.T)):
 		t_tensor = torch.full((n_images,), t, device=model.device, dtype=torch.long)
 		epsilon = model(x_t, t_tensor)
@@ -44,13 +46,16 @@ def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', sho
 		# Some info
 		mean = float(x_t.mean().item())
 		std = float(x_t.std().item())
-		print(f"Step {t}: mean={mean:.3f}, std={std:.3f}")
+		# print(f"Step {t}: mean={mean:.3f}, std={std:.3f}")
 		line_mean[scheduler.T - t - 1] = mean
 		line_std[scheduler.T - t - 1] = std
 		
 		if t in show_steps:
 			bgc.paste(to_pil(x_t[0]), (64 * show_steps.index(t), 0))
 			bgc.paste(to_pil(x_0[0]), (64 * show_steps.index(t), 64))
+		
+		pbar.update(1)
+	pbar.close()
 	
 	x = np.linspace(scheduler.T-2, 0, scheduler.T-1)
 	plt.plot(x, line_mean, label='Line Mean')

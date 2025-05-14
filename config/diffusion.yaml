@@ -1,6 +1,6 @@
 defaults:
   - model: unet
-  - schedule: linear
+  - schedule: cosine
   - train: unconditional
   - tests: unconditional
   - _self_
