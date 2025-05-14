@@ -1,9 +1,11 @@
 params:
   # Load Model
-  model_abs_path: /Volumes/Filip'sTech/outputs/2025-05-13/19-53-12/steps/step-500.pth
+  model_abs_path: /Volumes/Filip'sTech/outputs/2025-05-13/19-53-12/steps/step-450.pth
   # Showcasing
   n_images: 1
   test_img_path: data/resized_images/Cat/cat-test_(1).jpeg
   show_steps: [1, 100, 200, 300, 400, 500, 600, 700, 800, 900, 920, 940, 960, 980, 990, 999]
+  ds_show_class: Cat
+  ds_show_columns: 10
   # Device
   device: ${run.device}

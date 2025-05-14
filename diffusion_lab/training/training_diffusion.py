@@ -17,10 +17,10 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torchvision import transforms
 
 from diffusion_lab.datasets.dataset_diffusion import DiffusionDataset
 from diffusion_lab.models.noise_scheduler import NoiseScheduler
+from diffusion_lab.utils.transforms import train_transform
 
 log = logging.getLogger(__name__)
 
@@ -196,17 +196,6 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 @hydra.main(config_path="../../config", config_name="diffusion", version_base="1.3")
 def main(cfg: DictConfig):
 	mlflow.set_experiment(cfg.project.name)
-	
-	train_transform = transforms.Compose([
-		transforms.Resize(64),  # todo: config
-		transforms.RandomResizedCrop((64, 64), scale=(0.8, 1.0), ratio=(0.8, 1.2)),
-		transforms.RandomHorizontalFlip(p=0.5),
-		transforms.ToTensor(),  # Convert image to tensor
-		transforms.Normalize(  # Normalize RGB pixel values: [0, 255] -> [-1, 1]
-			mean=[0.5, 0.5, 0.5],
-			std=[0.5, 0.5, 0.5]
-		)
-	])
 	
 	dataset = DiffusionDataset(dataset_path=cfg.train.params.dataset, transform=train_transform)
 	loader = DataLoader(dataset, batch_size=cfg.train.params.bach_size, shuffle=True, **cfg.train.loader.params)
