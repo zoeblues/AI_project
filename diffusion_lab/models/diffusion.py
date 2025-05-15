@@ -150,6 +150,7 @@ class UNet(nn.Module):
 		x = self.bottleneck(x, time_encoded)
 		#print(f"Bottleneck output: {x.shape}")
 		
+		
 		# Reverse skip connections (remove bottleneck input)
 		skip_connections = list(reversed(skip_connections))
 		
