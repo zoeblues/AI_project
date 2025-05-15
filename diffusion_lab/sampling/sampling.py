@@ -5,18 +5,26 @@ import torch.nn as nn
 
 from diffusion_lab.models.noise_scheduler import NoiseScheduler
 
+import torch
 
-def sample_image(model, scheduler: NoiseScheduler, n_timesteps=1_000, n_images=1, resolution=(128, 128)):
+from diffusion_lab.models.noise_scheduler import NoiseScheduler
+
+
+@torch.no_grad()
+def sample_image(model, scheduler: NoiseScheduler, n_timesteps=1_000, n_images=1, resolution=(64, 64), x_T=None):
 	model.eval()
-	x_t = torch.randn((n_images, 3, *resolution), device=model.device)  # B, C, W, H
+	if x_T is None:
+		x_t = torch.randn((n_images, 3, *resolution), device=model.device)  # B, C, W, H
+	else:
+		x_t = x_T
+	
 	with torch.no_grad():
 		for t in reversed(range(1, n_timesteps)):
-			print(t)
-			t = torch.tensor([t], device=model.device)
-			epsilon = model(x_t, t)
-			x_t, _ = scheduler.p_backward(x_t, epsilon, t)
+			t_tensor = torch.full((n_images,), t, device=model.device, dtype=torch.long)
+			epsilon = model(x_t, t_tensor)
+			x_t, _ = scheduler.p_backward(x_t, epsilon, t_tensor)
+	# x_t = torch.clamp(x_t, -3, 3)
 	return x_t
-
 
 if __name__ == '__main__':
 	from diffusion_lab.models.noise_scheduler import CosineNoiseScheduler, LinearNoiseScheduler
@@ -70,3 +78,4 @@ if __name__ == '__main__':
 	bgc.paste(to_pil(x_0[0]), (256, 0))
 	bgc.paste(to_pil(sampled[0]), (384, 0))
 	bgc.show()
+

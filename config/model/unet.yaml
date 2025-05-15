@@ -4,7 +4,7 @@ params:
   base_channels: 64
   image_size: 128
   in_channels: 3
-  num_groups: 32
+  num_groups: 16 # changed from 32
   time_embedding_factor: 4
   num_att_heads: 4
   num_layers: 2

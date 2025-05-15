@@ -52,13 +52,6 @@ class UNet(nn.Module):
 			),
 			ConvDownBlock(
 				cfg.params.base_channels,
-				cfg.params.base_channels,
-				cfg.params.num_layers,
-				cfg.params.time_emb_channels,
-				cfg.params.num_groups
-			),
-			ConvDownBlock(
-				cfg.params.base_channels,
 				cfg.params.base_channels * 2,
 				cfg.params.num_layers,
 				cfg.params.time_emb_channels,
@@ -123,13 +116,6 @@ class UNet(nn.Module):
 				cfg.params.time_emb_channels,
 				cfg.params.num_groups
 			),
-			ConvUpBlock(
-				cfg.params.base_channels * 2,
-				cfg.params.base_channels,
-				cfg.params.num_layers,
-				cfg.params.time_emb_channels,
-				cfg.params.num_groups
-			),
 		])
 		
 		# Output projection
@@ -151,16 +137,18 @@ class UNet(nn.Module):
 		time_encoded = self.positional_encoding(time)
 		
 		x = self.initial_conv(input_tensor)
-		
+		#print(f"Initial conv output: {x.shape}")
 		skip_connections = [x]
 		
 		# Downsampling path
 		for block in self.downsample_blocks:
 			x = block(x, time_encoded)
+			#print(f"Down Block {i + 1} output: {x.shape}")
 			skip_connections.append(x)
 		
 		# Bottleneck
 		x = self.bottleneck(x, time_encoded)
+		#print(f"Bottleneck output: {x.shape}")
 		
 		# Reverse skip connections (remove bottleneck input)
 		skip_connections = list(reversed(skip_connections))
@@ -168,9 +156,28 @@ class UNet(nn.Module):
 		# Upsampling path with skip connections
 		for block, skip in zip(self.upsample_blocks, skip_connections):
 			x = torch.cat([x, skip], dim=1)
+			#print(f"Up Block {i + 1} input (after concat): {x.shape}")
 			x = block(x, time_encoded)
+			#print(f"Up Block {i + 1} output: {x.shape}")
 		
+		out = self.output_conv(x)
+		#print(f"Output conv: {out.shape}")
 		return self.output_conv(x)
+
+if __name__ == "__main__":
+
+	from omegaconf import OmegaConf
+	import torch
+	
+	cfg = OmegaConf.load("../../config/model/unet.yaml")
+	dummy_input = torch.randn(1, 3, 64, 64)
+	dummy_time = torch.tensor([500])
+	
+	model = UNet(cfg=cfg, device='cpu')
+	model.eval()
+	
+	with torch.no_grad():
+		output = model(dummy_input, dummy_time)
 
 
 
