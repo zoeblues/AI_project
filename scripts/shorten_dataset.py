@@ -39,4 +39,4 @@ def shorten_dataset(input_dir, output_dir, base_dir="data", downsample_weight=0.
 
 
 if __name__ == '__main__':
-	shorten_dataset('resized_images', 'less_images')
+	shorten_dataset('flower-dataset', 'flower-mini', downsample_weight=0.4, out_file='flower-mini.csv')

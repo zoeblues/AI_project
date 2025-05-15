@@ -141,7 +141,7 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 				x_t, epsilon = scheduler.q_forward(batch, t)
 				
 				out = model(x_t, t)
-				loss = criterion(out, epsilon)
+				loss = criterion(epsilon, out)
 				running_loss += loss.detach().item() * batch.shape[0]
 				
 				# Gradient Accumulation: Normalize the loss for
