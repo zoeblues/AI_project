@@ -53,8 +53,9 @@ class NoiseScheduler:
 		alpha_bar_tm1 = self.alpha_bars[t - 1].view(batch_size, 1, 1, 1)
 		
 		x_0_pred = (x_t - torch.sqrt(1 - alpha_bar) * epsilon_t) / torch.sqrt(alpha_bar)
+		x_0_pred = torch.clamp(x_0_pred, -1, 1)
 		
-		test = x_0_pred[0][0].cpu().detach().numpy()
+		# test = x_0_pred[0][0].cpu().detach().numpy()
 		# x_0_pred = torch.clamp(x_0_pred, min=-1, max=1)
 		
 		# normalization = transforms.Normalize(mean=x_0_pred.mean(), std=x_0_pred.std())
@@ -70,6 +71,8 @@ class NoiseScheduler:
 		# normalization = transforms.Normalize(mean=x_t_prev.mean(), std=x_t_prev.std())
 		# x_t_prev = normalization(x_t_prev)
 		# img = x_t_prev[0][0].cpu().detach().numpy()
+		
+		# x_tm1 = 1 / torch.sqrt(alpha_t) * (x_t - ((1 - alpha_t) / (torch.sqrt(1 - alpha_bar))) * epsilon_t) + torch.sqrt(beta_t) * epsilon_t
 		
 		return x_t_prev, x_0_pred
 
