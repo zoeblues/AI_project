@@ -27,9 +27,9 @@ def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', sho
 	model.to(device)
 	model.eval()
 	
-	x_t = torch.randn((n_images, 3, *resolution), device=model.device)  # B, C, W, H
-	if start_noise is not None:
-		x_t = start_noise
+	if start_noise is None:
+		start_noise = torch.randn((n_images, 3, *resolution), device=model.device)  # B, C, W, H
+	x_t = start_noise
 	
 	line_mean = np.zeros((scheduler.T-1,), dtype=float)
 	line_std = np.zeros((scheduler.T-1,))
@@ -40,7 +40,7 @@ def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', sho
 	for t in reversed(range(1, scheduler.T)):
 		t_tensor = torch.full((n_images,), t, device=model.device, dtype=torch.long)
 		epsilon = model(x_t, t_tensor)
-		x_t, x_0 = scheduler.p_backward(x_t, epsilon, t_tensor)
+		x_t, x_0 = scheduler.p_backward(x_t, epsilon, t_tensor, epsilon_t=start_noise)
 		# test = x_t.detach().cpu().numpy()
 		
 		# Some info

@@ -67,8 +67,7 @@ def main(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test
 
 
 @torch.no_grad()
-def plot_timestep_loss(model, scheduler, model_abs_path='steps/final.pth', test_img_path='test.jpg', device='cpu',
-                       **kwargs):
+def plot_timestep_loss(model, scheduler, model_abs_path='final.pth', test_img_path='test.jpg', device='cpu', **kwargs):
 	model.load_state_dict(torch.load(model_abs_path, map_location=device))
 	model.to(device)
 	model.eval()
@@ -101,6 +100,13 @@ def plot_timestep_loss(model, scheduler, model_abs_path='steps/final.pth', test_
 	plt.title('Noise prediction Loss, per Diffusion step')
 	
 	plt.show()
+
+
+@torch.no_grad()
+def plot_timestep_mean_std(model, scheduler, model_abs_path='final.pth', test_img_path='test.jpg', device='cpu', **kwargs):
+	model.load_state_dict(torch.load(model_abs_path, map_location=device))
+	model.to(device)
+	model.eval()
 
 
 @hydra.main(config_path="../config", config_name="diffusion", version_base="1.3")
