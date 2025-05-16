@@ -1,27 +1,20 @@
 import importlib
-import os
-
 import hydra
 import numpy as np
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from diffusion_lab.models.noise_scheduler import CosineNoiseScheduler, LinearNoiseScheduler, NoiseScheduler
-# from diffusion_lab.models.diffusion import UNet
-from diffusion_lab.models.unet import UNet
-from diffusion_lab.sampling.sampling import sample_image
+from diffusion_lab.models.noise_scheduler import NoiseScheduler
 from diffusion_lab.utils.transforms import to_pil
-from diffusion_lab.ddpm import Diffusion, save_images
+from diffusion_lab.utils.plot_images import show_save_images, plot_lines
 
-from omegaconf import DictConfig, OmegaConf
-from torchvision.transforms import transforms
-from PIL import Image
+from omegaconf import DictConfig
 
 import torch
 
 
 @torch.no_grad()
-def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', show_steps=None, n_images=1, resolution=(64, 64), start_noise=None, device='cpu', seed=None, **kwargs):
+def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', test_output_path='results/',
+         show_steps=None, n_images=1, resolution=(64, 64), start_noise=None, device='cpu', seed=None, **kwargs):
 	if show_steps is None:
 		show_steps = [1, 500, 999]
 	
@@ -36,43 +29,47 @@ def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', sho
 		start_noise = torch.randn((n_images, 3, *resolution)).to(device)
 	x_t = start_noise
 	
-	line_mean = np.zeros((scheduler.T-1,), dtype=float)
-	line_std = np.zeros((scheduler.T-1,))
+	line_mean = np.zeros((scheduler.T - 1,))
+	line_std = np.zeros((scheduler.T - 1,))
 	
-	n_columns = len(show_steps)
-	bgc = Image.new("RGB", (64 * n_columns, 64 * 2), color=(255, 255, 255)).convert("RGB")
+	image_backlog = [[] for _ in range(n_images)]
+	
 	pbar = tqdm(total=scheduler.T - 1)
 	for t in reversed(range(1, scheduler.T)):
+		# Basic sampling loop
 		t_tensor = torch.full((n_images,), t, device=model.device, dtype=torch.long)
 		epsilon = model(x_t, t_tensor)
 		x_t, x_0 = scheduler.p_backward(x_t, epsilon, t_tensor)
-		# test = x_t.detach().cpu().numpy()
 		
-		# Some info
+		# Some info about images, prep for plotting mean and std of image at timestep
 		mean = float(x_t.mean().item())
 		line_mean[scheduler.T - t - 1] = mean
 		std = float(x_t.std().item())
 		line_std[scheduler.T - t - 1] = std
 		
 		if t in show_steps:
-			bgc.paste(to_pil(torch.clamp(x_t[0], -1, 1)), (64 * (n_columns - show_steps.index(t) - 1), 0))
-			bgc.paste(to_pil(torch.clamp(x_0[0], -1, 1)), (64 * (n_columns - show_steps.index(t) - 1), 64))
+			for i in range(n_images):
+				image_backlog[i].append([
+					to_pil(torch.clamp(x_t[i], -1, 1)),
+					to_pil(torch.clamp(x_0[i], -1, 1)),
+				])
 		
 		pbar.update(1)
 	pbar.close()
 	
-	bgc.show(title="OurSchedulerResults")
+	for i in range(n_images):
+		show_save_images(image_backlog[i], test_output_path, f"SampledImage-{i}-timesteps.jpg", show=False)
 	
-	x = np.linspace(scheduler.T-2, 0, scheduler.T-1)
-	plt.plot(x, line_mean, label='Line Mean')
-	plt.plot(x, line_std, label='Line Std')
-	
-	plt.xlabel('Diffusion Step')
-	plt.ylabel('Y-axis')
-	plt.title('Mean and Std by Diffusion Step - x_t')
-	
-	plt.legend()
-	plt.show()
+	x = np.linspace(scheduler.T - 2, 0, scheduler.T - 1)
+	plot_lines(
+		x_values=[x, x],
+		y_values=[line_mean, line_std],
+		line_labels=['Line Mean', 'Line Std'],
+		x_label='Diffusion Step',
+		y_label='Y-axis',
+		title='Mean and Std by Diffusion Step - x_t',
+		save_path=test_output_path
+	)
 
 
 @hydra.main(config_path="../config", config_name="diffusion", version_base="1.3")

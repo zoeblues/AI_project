@@ -11,3 +11,4 @@ mlflow-skinny~=2.21.3
 omegaconf~=2.3.0
 tqdm~=4.67.1
 PyYAML~=6.0.2
+matplotlib~=3.10.1
