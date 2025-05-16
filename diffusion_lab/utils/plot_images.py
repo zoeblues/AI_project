@@ -22,6 +22,19 @@ def show_save_images(image_array, save_path="results", title="Image.jpg", show=T
 	bgc.save(pjoin(save_path, title))
 
 
+def save_gif(images, save_path="results", title="GIF.gif"):
+	os.makedirs(save_path, exist_ok=True)
+	
+	# Save images as GIF
+	images[0].save(
+		pjoin(save_path, title),
+		save_all=True,
+		append_images=images[1:],
+		duration=0,  # milliseconds
+		loop=1
+	)
+
+
 def plot_lines(x_values, y_values, line_labels, x_label="X-Label", y_label="Y-Label", title="Title", save_path="results", show=True):
 	# Add line values to the plot
 	for i in range(len(x_values)):

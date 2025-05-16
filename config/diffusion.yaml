@@ -19,7 +19,7 @@ tests:
     test_img_path: data/flower-mini/74/image_01181_jpg.rf.05fa484251c694634a0fd1e94c5c4939.jpg
     test_output_path: ${hydra:runtime.output_dir}/results/
     n_images: 2
-#    seed: 0
+    seed: 203
 
 run:
   device: mps
