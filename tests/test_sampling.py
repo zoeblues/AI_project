@@ -1,4 +1,5 @@
 import importlib
+import os
 
 import hydra
 import numpy as np
@@ -10,6 +11,7 @@ from diffusion_lab.models.noise_scheduler import CosineNoiseScheduler, LinearNoi
 from diffusion_lab.models.unet import UNet
 from diffusion_lab.sampling.sampling import sample_image
 from diffusion_lab.utils.transforms import to_pil
+from diffusion_lab.ddpm import Diffusion, save_images
 
 from omegaconf import DictConfig, OmegaConf
 from torchvision.transforms import transforms
@@ -19,7 +21,7 @@ import torch
 
 
 @torch.no_grad()
-def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', show_steps=None, n_images=1, resolution=(64, 64), start_noise=None, device='cpu', **kwargs):
+def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', show_steps=None, n_images=1, resolution=(64, 64), start_noise=None, device='cpu', seed=None, **kwargs):
 	if show_steps is None:
 		show_steps = [1, 500, 999]
 	
@@ -27,8 +29,11 @@ def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', sho
 	model.to(device)
 	model.eval()
 	
+	if seed is not None:
+		torch.random.manual_seed(seed)
+	
 	if start_noise is None:
-		start_noise = torch.randn((n_images, 3, *resolution), device=model.device)  # B, C, W, H
+		start_noise = torch.randn((n_images, 3, *resolution)).to(device)
 	x_t = start_noise
 	
 	line_mean = np.zeros((scheduler.T-1,), dtype=float)
@@ -40,22 +45,23 @@ def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', sho
 	for t in reversed(range(1, scheduler.T)):
 		t_tensor = torch.full((n_images,), t, device=model.device, dtype=torch.long)
 		epsilon = model(x_t, t_tensor)
-		x_t, x_0 = scheduler.p_backward(x_t, epsilon, t_tensor, epsilon_t=start_noise)
+		x_t, x_0 = scheduler.p_backward(x_t, epsilon, t_tensor)
 		# test = x_t.detach().cpu().numpy()
 		
 		# Some info
 		mean = float(x_t.mean().item())
-		std = float(x_t.std().item())
-		# print(f"Step {t}: mean={mean:.3f}, std={std:.3f}")
 		line_mean[scheduler.T - t - 1] = mean
+		std = float(x_t.std().item())
 		line_std[scheduler.T - t - 1] = std
 		
 		if t in show_steps:
-			bgc.paste(to_pil(x_t[0]), (64 * show_steps.index(t), 0))
-			bgc.paste(to_pil(x_0[0]), (64 * show_steps.index(t), 64))
+			bgc.paste(to_pil(torch.clamp(x_t[0], -1, 1)), (64 * (n_columns - show_steps.index(t) - 1), 0))
+			bgc.paste(to_pil(torch.clamp(x_0[0], -1, 1)), (64 * (n_columns - show_steps.index(t) - 1), 64))
 		
 		pbar.update(1)
 	pbar.close()
+	
+	bgc.show(title="OurSchedulerResults")
 	
 	x = np.linspace(scheduler.T-2, 0, scheduler.T-1)
 	plt.plot(x, line_mean, label='Line Mean')
@@ -63,12 +69,10 @@ def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', sho
 	
 	plt.xlabel('Diffusion Step')
 	plt.ylabel('Y-axis')
-	plt.title('Mean and Std by Diffusion Step')
+	plt.title('Mean and Std by Diffusion Step - x_t')
 	
 	plt.legend()
 	plt.show()
-	
-	bgc.show()
 
 
 @hydra.main(config_path="../config", config_name="diffusion", version_base="1.3")

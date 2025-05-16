@@ -1,6 +1,6 @@
 defaults:
   - model: unet
-  - schedule: cosine
+  - schedule: linear
   - train: unconditional
   - tests: unconditional
   - _self_
@@ -15,8 +15,9 @@ train:
 
 tests:
   params:
-    model_abs_path: /Volumes/Filip'sTech/outputs/2025-05-15/11-06-51/steps/step-500.pth
+    model_abs_path: /Volumes/Filip'sTech/outputs/2025-05-15/23-56-58/steps/step-1000.pth
     test_img_path: data/flower-mini/74/image_01181_jpg.rf.05fa484251c694634a0fd1e94c5c4939.jpg
+#    seed: 0
 
 run:
   device: mps
