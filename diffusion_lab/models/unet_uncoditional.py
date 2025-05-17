@@ -48,14 +48,37 @@ class ResBlock(nn.Module):
 		return self.skip(x) + h
 
 
+class DownConv(nn.Module):
+	def __init__(self):
+		super().__init__()
+		# Wrapper for MaxPool down sampling
+		self.conv = nn.MaxPool2d(kernel_size=2, stride=2)
+	
+	def forward(self, x):
+		return self.conv(x)
+
+
+class UpConv(nn.Module):
+	def __init__(self, out_channels):
+		super().__init__()
+		# Wrapper for Upsampling
+		self.conv = nn.Sequential(
+			nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+			nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1),
+		)
+	
+	def forward(self, x):
+		return self.conv(x)
+
+
 class ResolutionLayerDown(nn.Module):
 	def __init__(self, in_channels, out_channels,
 	             embed_channels=256, norm_groups=8, dropout=0.2,
-	             n_blocks=2, init_downsample=True, do_self_attention=False):
+	             n_blocks=2, do_downsample=True, do_self_attention=False):
 		super().__init__()
 		# For ease of use whit UNet skip-connections, downsampling is done at the beginning of Resolution layer.
 		# However not all Layers start with down sampling, example first Layer.
-		self.downsample = nn.MaxPool2d(2, stride=2) if init_downsample else None
+		self.downsample = DownConv() if do_downsample else None
 		
 		# Add variable number of ResBlocks on a single Resolution Layer
 		res_blocks = []
@@ -79,7 +102,37 @@ class ResolutionLayerDown(nn.Module):
 			x = res_block(x, t)
 		
 		return x
+
+
+class ResolutionLayerUp(nn.Module):
+	def __init__(self, in_channels, out_channels, skip_channels,
+	             embed_channels=256, norm_groups=8, dropout=0.2,
+	             n_blocks=2, do_upsample=True, do_self_attention=False):
+		super().__init__()
+		res_blocks = []
+		for i in range(n_blocks):
+			in_channels = in_channels + skip_channels if i == 0 else out_channels
+			res_blocks.append(ResBlock(
+				in_channels=in_channels,
+				out_channels=out_channels,
+				embed_channels=embed_channels,
+				norm_groups=norm_groups,
+				dropout=dropout,
+			))
+		self.res_blocks = nn.ModuleList(res_blocks)
 		
+		# When upsampling, first perform the Up sapling to new resolution,
+		# then, apply learned convolution intended for smoothing and handling artefacts
+		self.upsample = UpConv(out_channels) if do_upsample else None
+	
+	def forward(self, x, x_skip, t):
+		for res_block in self.res_blocks:
+			x = res_block(x, t)
+		
+		if self.upsample is not None:
+			x = self.upsample(x)
+		
+		return x
 		
 
 class UNet(nn.Module):
