@@ -38,8 +38,8 @@ def sampling_gif(model, scheduler: NoiseScheduler, x_t, n_images=1, frame_step=1
 	
 	# Save gifs of all sampled images
 	for i in range(n_images):
-		save_gif(image_backlog_x_t[i], test_output_path, f"SamplingImage-xt-{i}.gif")
-		save_gif(image_backlog_x_0[i], test_output_path, f"SamplingImage-x0-{i}.gif")
+		save_gif(image_backlog_x_t[i], test_output_path, f"SamplingImage{i}-xt.gif")
+		save_gif(image_backlog_x_0[i], test_output_path, f"SamplingImage{i}-x0.gif")
 
 
 def sampling_image_steps(model, scheduler: NoiseScheduler, x_t, n_images=1, show_steps=None,
@@ -102,17 +102,17 @@ def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', tes
 		start_noise = torch.randn((n_images, 3, *resolution)).to(device)
 	x_t = start_noise
 	
+	# Full image sampling animation
+	if seed is not None:
+		torch.random.manual_seed(seed)
+	sampling_gif(model, scheduler, x_t, n_images=n_images, frame_step=frame_step, test_output_path=test_output_path)
+	
 	# Image sampling with timesteps visible
 	if seed is not None:
 		torch.random.manual_seed(seed)
 	sampling_image_steps(model, scheduler, x_t, n_images=n_images, show_steps=show_steps,
 	                     test_output_path=test_output_path)
 	
-	# Full image sampling animation
-	if seed is not None:
-		torch.random.manual_seed(seed)
-	sampling_gif(model, scheduler, x_t, n_images=n_images, frame_step=frame_step, test_output_path=test_output_path)
-
 
 @hydra.main(config_path="../config", config_name="diffusion", version_base="1.3")
 def load_run(cfg: DictConfig):

@@ -1,8 +1,11 @@
 import os
+from time import sleep
 
+import numpy as np
 from PIL import Image
 from os.path import join as pjoin
 from matplotlib import pyplot as plt
+from moviepy import VideoFileClip, ImageSequenceClip
 
 
 def show_save_images(image_array, save_path="results", title="Image.jpg", show=True):
@@ -33,6 +36,11 @@ def save_gif(images, save_path="results", title="GIF.gif"):
 		duration=0,  # milliseconds
 		loop=1
 	)
+	
+	# Save as MP4 for easier sharing
+	img_np_array = [np.array(img) for img in images]
+	clip = ImageSequenceClip(img_np_array, fps=24)
+	clip.write_videofile(pjoin(save_path, f"{title}.mp4"), codec="libx264", fps=24)
 
 
 def plot_lines(x_values, y_values, line_labels, x_label="X-Label", y_label="Y-Label", title="Title", save_path="results", show=True):
