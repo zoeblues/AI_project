@@ -17,7 +17,7 @@ _default_transform = transforms.Compose([
 
 class DiffusionDataset(Dataset):
 	def __init__(self, dataset_path, transform=None):
-		data = pd.read_csv(dataset_path)[:10]
+		data = pd.read_csv(dataset_path)
 		# Save the transformation provided by the user or use default
 		self.transform = transform if transform is not None else _default_transform
 		# Remember to change pandas.Series into a list or np.array for speed: `.tolist()` or `.to_numpy()`
