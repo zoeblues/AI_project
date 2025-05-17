@@ -101,7 +101,7 @@ class UpConv(nn.Module):
 class ResolutionLayerDown(nn.Module):
 	def __init__(self, in_channels, out_channels, n_blocks=2,
 	             emb_channels=256, norm_groups=8, dropout=0.2,
-	             do_self_attention=False):
+	             do_self_attention=False, num_heads=4):
 		super().__init__()
 		# Add variable number of ResBlocks on a single Resolution Layer
 		res_blocks = []
@@ -116,6 +116,8 @@ class ResolutionLayerDown(nn.Module):
 			))
 		self.res_blocks = nn.ModuleList(res_blocks)
 		
+		self.self_attn = SelfAttention(channels=out_channels, heads=num_heads) if do_self_attention else None
+		
 		self.downsample = DownConv()
 	
 	def forward(self, x, t):
@@ -123,13 +125,17 @@ class ResolutionLayerDown(nn.Module):
 		for res_block in self.res_blocks:
 			x = res_block(x, t)
 		
+		# Self Attention
+		if self.self_attn is not None:
+			x = self.self_attn(x)
+		
 		return self.downsample(x), x
 
 
 class ResolutionLayerUp(nn.Module):
 	def __init__(self, in_channels, out_channels, skip_channels, n_blocks=2,
 	             emb_channels=256, norm_groups=8, dropout=0.2,
-	             do_self_attention=False):
+	             do_self_attention=False, num_heads=4):
 		super().__init__()
 		self.upsample = UpConv(in_channels)
 		
@@ -144,11 +150,17 @@ class ResolutionLayerUp(nn.Module):
 				dropout=dropout,
 			))
 		self.res_blocks = nn.ModuleList(res_blocks)
+		
+		self.self_attn = SelfAttention(channels=out_channels, heads=num_heads) if do_self_attention else None
 	
 	def forward(self, x, skip_x, t):
 		x = self.upsample(x)
 		x = torch.cat([skip_x, x], dim=1)
 		for res_block in self.res_blocks:
 			x = res_block(x, t)
+			
+		# Self Attention
+		if self.self_attn is not None:
+			x = self.self_attn(x)
 		
 		return x

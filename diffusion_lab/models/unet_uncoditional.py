@@ -6,7 +6,8 @@ from diffusion_lab.models.modules import *
 
 class UNet(nn.Module):
 	def __init__(self, in_channels, out_channels, base_channels=320, channel_multipliers=(1, 2, 4, 4),
-	             emb_channels=256, norm_groups=8, dropout=0.2, device="cpu"):
+	             emb_channels=256, norm_groups=8, dropout=0.2,
+	             do_self_attention=(False, False, True, True), num_heads=4, device="cpu"):
 		super().__init__()
 		self.time_emb_channels = emb_channels
 		self.device = device
@@ -19,7 +20,7 @@ class UNet(nn.Module):
 			down_layers.append(ResolutionLayerDown(
 				in_channels=prev_channels, out_channels=base_channels * multiply,
 				emb_channels=emb_channels, norm_groups=norm_groups, dropout=dropout,
-				do_self_attention=False  # todo: change
+				do_self_attention=do_self_attention[i], num_heads=num_heads,
 			))
 			prev_channels = base_channels * multiply
 		self.down_layers = nn.ModuleList(down_layers)
@@ -35,7 +36,7 @@ class UNet(nn.Module):
 				in_channels=prev_channels, out_channels=base_channels * multiply,
 				skip_channels=base_channels * multiply,
 				emb_channels=emb_channels, norm_groups=norm_groups, dropout=dropout,
-				do_self_attention=False  # todo: change
+				do_self_attention=do_self_attention[i], num_heads=num_heads,
 			))
 			prev_channels = base_channels * multiply
 		self.up_layers = nn.ModuleList(up_layers)
