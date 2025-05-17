@@ -10,7 +10,7 @@ class NoiseScheduler:
 	
 	def __init__(self, n_timesteps=1000, device="cpu"):
 		"""
-		:param n_timesteps: 
+		:param n_timesteps:
 		:param device: Device on which to generate the noise: "cpu"
 		"""
 		self.T = n_timesteps
@@ -42,6 +42,7 @@ class NoiseScheduler:
 	
 	def p_backward(self, x_t, epsilon_t, t):
 		batch_size = x_t.size(0)
+
 		t = t.view(-1) if t.ndim == 0 else t
 		
 		z = torch.randn_like(x_t, device=self.device) if t > 1 else torch.zeros_like(x_t, device=self.device)
@@ -63,6 +64,7 @@ class NoiseScheduler:
 		# x_t_prev = torch.clamp(x_t_prev, -1, 1)
 		# pred_x_0 = torch.clamp(pred_x_0, -1.0, 1.0)
 		img = x_t_prev[0][0].cpu().detach().numpy()
+
 		
 		return x_t_prev, x_0_pred
 
@@ -80,9 +82,11 @@ class CosineNoiseScheduler(NoiseScheduler):
 		# Calculate alpha_bar according to the formula
 		alphas_bar = torch.cos(((x / n_timesteps) + s) / (1 + s) * np.pi * 0.5) ** 2
 		alphas_bar = alphas_bar / alphas_bar[0]
+		
 		# Calculate beta in order to clip it, for numerical stability  # todo: test if necessary
 		betas = 1 - (alphas_bar[1:] / alphas_bar[:-1])
 		betas = torch.clip(betas, 0.0001, 0.9999)
+		
 		# Calculate back into alpha_bar from beta
 		alphas = 1.0 - betas
 		# alphas_bar = torch.cumprod(alphas, dim=0)
@@ -104,3 +108,4 @@ class LinearNoiseScheduler(NoiseScheduler):
 		self.betas = torch.linspace(beta_start, beta_end, n_timesteps, device=self.device)
 		self.alphas = 1.0 - self.betas
 		self.alpha_bars = torch.cumprod(self.alphas, dim=0)
+
