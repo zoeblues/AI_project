@@ -9,7 +9,7 @@ params:
   timesteps: 1_000
   epochs: 500
   bach_size: 12
-  device: mps
+  device: ${run.device}
   # Additional
   do-ImportanceSampling: false
   n_warmup_rounds: 5

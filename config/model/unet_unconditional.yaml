@@ -1,0 +1,13 @@
+name: unet-unconditional
+type: diffusion_lab.models.unet_unconditional.UNet
+params:
+  in_channels: 3
+  out_channels: 3
+  base_channels: 64
+  channel_multipliers: ${tuple_int:1,2,4}
+  emb_channels: 256
+  norm_groups: 1
+  dropout: 0.2
+  do_self_attention: ${tuple_bool:True,True,True}
+  num_heads: 4
+  device: ${run.device}

@@ -6,7 +6,7 @@ import hydra
 import importlib
 
 import numpy as np
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from tqdm import tqdm
 import mlflow
@@ -23,6 +23,8 @@ from diffusion_lab.models.noise_scheduler import NoiseScheduler
 from diffusion_lab.utils.transforms import train_transform
 
 log = logging.getLogger(__name__)
+OmegaConf.register_new_resolver("tuple_int", lambda *args: tuple(map(int, args)))
+OmegaConf.register_new_resolver("tuple_bool", lambda *args: tuple(map(bool, args)))
 
 
 def warm_up_importance_sampling(model, scheduler: NoiseScheduler, loader, optimizer, n_rounds, backlog_size, timesteps,

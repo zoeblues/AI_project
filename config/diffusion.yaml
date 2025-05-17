@@ -1,5 +1,5 @@
 defaults:
-  - model: unet
+  - model: unet_unconditional
   - schedule: linear
   - train: unconditional
   - tests: unconditional
@@ -10,8 +10,13 @@ project:
   name: unconditional-diffusion
 
 train:
+  run_name: run-13
+  run_desc: New UNet
   params:
-    dataset: ${hydra:runtime.cwd}/data/flower_training.csv
+    dataset: ${hydra:runtime.cwd}/data/flower-mini.csv
+    epochs: 500
+    bach_size: 10
+    save_step: 10
 
 tests:
   params:
