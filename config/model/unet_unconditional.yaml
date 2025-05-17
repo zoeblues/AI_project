@@ -8,6 +8,6 @@ params:
   emb_channels: 256
   norm_groups: 1
   dropout: 0.2
-  do_self_attention: ${tuple_bool:True,True,True}
+  do_self_attention: ${tuple_bool:False,True,True}
   num_heads: 4
   device: ${run.device}

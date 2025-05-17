@@ -5,6 +5,7 @@ params:
   n_images: 1
   frame_step: 3
   test_img_path: data/resized_images/Cat/cat-test_(1).jpeg
+  test_output_path: ${hydra:runtime.output_dir}/results/
   show_steps: [1, 100, 200, 300, 400, 500, 600, 700, 800, 900, 999]
   ds_show_class: Cat
   ds_show_columns: 10

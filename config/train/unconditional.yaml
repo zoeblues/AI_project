@@ -27,3 +27,6 @@ params:
   load_timestep: 0
   log_step: 1
   save_step: 10
+  # Sampling
+  n_images: 8
+  output_path: ${hydra:runtime.output_dir}/results/

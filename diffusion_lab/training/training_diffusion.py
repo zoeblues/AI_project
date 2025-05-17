@@ -21,6 +21,9 @@ from torch.utils.data import DataLoader
 from diffusion_lab.datasets.dataset_diffusion import DiffusionDataset
 from diffusion_lab.models.noise_scheduler import NoiseScheduler
 from diffusion_lab.utils.transforms import train_transform
+from diffusion_lab.sampling.sampling import sample_image
+from diffusion_lab.utils.plot_images import show_save_images
+from diffusion_lab.utils.transforms import to_pil
 
 log = logging.getLogger(__name__)
 OmegaConf.register_new_resolver("tuple_int", lambda *args: tuple(map(int, args)))
@@ -190,6 +193,9 @@ def train(model, scheduler, loader, optimizer, train_cfg, device='cpu'):
 					                              save_path=train_cfg.params.artifact_path)
 			if (epoch + 1) % train_cfg.params.save_step == 0 and epoch != 0:
 				torch.save(model.state_dict(), pjoin(train_cfg.params.save_path, f"step-{epoch + 1}.pth"))
+				images = sample_image(model, scheduler, n_images=train_cfg.params.n_images)
+				images = [[to_pil(images[i]) for i in range(train_cfg.params.n_images)]]
+				show_save_images(images, save_path=train_cfg.params.output_path, title=f"step-{epoch + 1}.png", show=False)
 	
 	# Save model
 	torch.save(model.state_dict(), pjoin(train_cfg.params.save_path, f"{train_cfg.params.model_name}.pth"))
