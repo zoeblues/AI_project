@@ -88,7 +88,7 @@ class UNet(nn.Module):
 		# Upsampling path
 		self.upsample_blocks = nn.ModuleList([
 			ConvUpBlock(
-				cfg.params.base_channels * 8,
+				cfg.params.base_channels * 4 + cfg.params.base_channels * 4,
 				cfg.params.base_channels * 4,
 				cfg.params.num_layers,
 				cfg.params.time_emb_channels,
@@ -103,7 +103,7 @@ class UNet(nn.Module):
 				cfg.params.num_att_heads
 			),
 			ConvUpBlock(
-				cfg.params.base_channels * 4,
+				cfg.params.base_channels * 2 + cfg.params.base_channels * 2,
 				cfg.params.base_channels * 2,
 				cfg.params.num_layers,
 				cfg.params.time_emb_channels,
