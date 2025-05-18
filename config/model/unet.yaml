@@ -1,5 +1,5 @@
 name: unet
-type: diffusion_lab.models.diffusion.UNet
+type: diffusion_lab.models.unet.UNet
 params:
   base_channels: 64
   image_size: 128

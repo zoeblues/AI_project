@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 
+
 def create_dataset_csv(data_folder, data_path='data', file_name='training.csv'):
 	# Dataset
 	dataset_csv = []

@@ -4,18 +4,29 @@ defaults:
 
 name: unconditional
 run_name: run-0
+run_desc: Description of current experiment
 params:
   timesteps: 1_000
-  epochs: 1_000
-  bach_size: 64
+  epochs: 500
+  bach_size: 12
+  device: ${run.device}
+  # Additional
+  do-ImportanceSampling: false
+  n_warmup_rounds: 5
+  history_size: 10
+  temperature: 5
+  do-GradientAccumulation: false
   accum_steps: 1
-  device: mps
   # Dataset & Dataloader
-  dataset: ${hydra:runtime.cwd}/data/diffusion_training.csv
+  dataset: ${hydra:runtime.cwd}/data/training-mini.csv
   # Additional info, model saving/loading
   save_path: ${hydra:runtime.output_dir}/steps
+  artifact_path: ${hydra:runtime.output_dir}/artifacts
   model_name: uncond_unet
   load_path: outputs/steps
   load_timestep: 0
-  log_step: 10
-  save_step: 50
+  log_step: 1
+  save_step: 10
+  # Sampling
+  n_images: 8
+  output_path: ${hydra:runtime.output_dir}/results/

@@ -40,33 +40,26 @@ class NoiseScheduler:
 		
 		return x_t, epsilon
 	
-	def p_backward(self, x_t, epsilon_t, t):
+	def p_backward(self, x_t, epsilon_theta, t, epsilon_t=None):
 		batch_size = x_t.size(0)
 
 		t = t.view(-1) if t.ndim == 0 else t
 		
-		z = torch.randn_like(x_t, device=self.device) if t > 1 else torch.zeros_like(x_t, device=self.device)
+		if epsilon_t is None:
+			z = torch.randn_like(x_t, device=self.device)
+		else:
+			z = epsilon_t
+		z[t == 0] = 0
 		
 		beta_t = self.betas[t].view(batch_size, 1, 1, 1)
 		alpha_t = self.alphas[t].view(batch_size, 1, 1, 1)
 		alpha_bar = self.alpha_bars[t].view(batch_size, 1, 1, 1)
-		alpha_bar_tm1 = self.alpha_bars[t - 1].view(batch_size, 1, 1, 1)
 		
-		x_0_pred = (x_t - torch.sqrt(1 - alpha_bar) * epsilon_t) / torch.sqrt(alpha_bar)
-		# normalization = transforms.Normalize(mean=x_0_pred.mean(), std=x_0_pred.std())
-		# x_0_pred = normalization(x_0_pred)
+		x_0_pred = (x_t - torch.sqrt(1 - alpha_bar) * epsilon_theta) / torch.sqrt(alpha_bar)
 		
-		img = x_0_pred[0][0].cpu().detach().numpy()
-		# x_0_pred = torch.clamp(x_0_pred, min=-1, max=1)
+		x_tm1 = 1 / torch.sqrt(alpha_t) * (x_t - ((1 - alpha_t) / (torch.sqrt(1 - alpha_bar))) * epsilon_theta) + torch.sqrt(beta_t) * z
 		
-		x_t_prev = torch.sqrt(alpha_bar_tm1) * x_0_pred + torch.sqrt(1 - alpha_bar_tm1) * z
-		# x_t_prev = (1 / torch.sqrt(alpha_t)) * (x_t - (1 - alpha_t) / (torch.sqrt(alpha_bar)) * epsilon_t) + torch.sqrt(1-alpha_t) * z
-		# x_t_prev = torch.clamp(x_t_prev, -1, 1)
-		# pred_x_0 = torch.clamp(pred_x_0, -1.0, 1.0)
-		img = x_t_prev[0][0].cpu().detach().numpy()
-
-		
-		return x_t_prev, x_0_pred
+		return x_tm1, x_0_pred
 
 
 class CosineNoiseScheduler(NoiseScheduler):

@@ -3,3 +3,5 @@ type: diffusion_lab.models.noise_scheduler.LinearNoiseScheduler
 params:
   beta_start: 0.0001
   beta_end: 0.02
+  n_timesteps: ${run.timesteps}
+  device: ${run.device}

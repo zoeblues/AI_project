@@ -2,3 +2,5 @@ name: cosine
 type: diffusion_lab.models.noise_scheduler.CosineNoiseScheduler
 params:
   s: 0.008
+  n_timesteps: ${run.timesteps}
+  device: ${run.device}

@@ -3,7 +3,8 @@
 venv
 
 # Ignore IDE files
-.idea
+.idea/
+.run/
 
 # Ignore private .env files
 *.env
