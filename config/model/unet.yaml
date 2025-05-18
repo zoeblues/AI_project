@@ -1,7 +1,11 @@
 name: unet
 type: diffusion_lab.models.unet.UNet
 params:
+  base_channels: 64
+  image_size: 128
   in_channels: 3
-  out_channels: 3
-  time_emb_channels: 256
-  device: ${run.device}
+  num_groups: 16 # changed from 32
+  time_embedding_factor: 4
+  num_att_heads: 4
+  num_layers: 2
+  time_emb_channels: 256 # 4*base_channels

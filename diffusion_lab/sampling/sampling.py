@@ -3,6 +3,10 @@ from tqdm import tqdm
 
 from diffusion_lab.models.noise_scheduler import NoiseScheduler
 
+import torch
+
+from diffusion_lab.models.noise_scheduler import NoiseScheduler
+
 
 @torch.no_grad()
 def sample_image(model, scheduler: NoiseScheduler, n_timesteps=1_000, n_images=1, resolution=(64, 64), x_t=None) -> torch.Tensor:
