@@ -9,14 +9,13 @@ from matplotlib import pyplot as plt
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
-# from diffusion_lab.models.diffusion import UNet
-from diffusion_lab.models.unet import UNet
-from diffusion_lab.models.noise_scheduler import NoiseScheduler, CosineNoiseScheduler, LinearNoiseScheduler
+from diffusion_lab.models.noise_scheduler import NoiseScheduler
 from diffusion_lab.utils.transforms import to_tensor, to_pil
+from diffusion_lab.utils.resolvers import *
 
 
 @torch.no_grad()
-def test_denoise(model: UNet, scheduler: NoiseScheduler, img_tensor: torch.Tensor, timestep: int, device='cpu'):
+def test_denoise(model, scheduler: NoiseScheduler, img_tensor: torch.Tensor, timestep: int, device='cpu'):
 	img_tensor = img_tensor.to(device)
 	if not isinstance(timestep, torch.Tensor):
 		timestep = torch.tensor([timestep], device=device)

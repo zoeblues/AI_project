@@ -24,10 +24,9 @@ from diffusion_lab.utils.transforms import train_transform
 from diffusion_lab.sampling.sampling import sample_image
 from diffusion_lab.utils.plot_images import show_save_images
 from diffusion_lab.utils.transforms import to_pil
+from diffusion_lab.utils.resolvers import *
 
 log = logging.getLogger(__name__)
-OmegaConf.register_new_resolver("tuple_int", lambda *args: tuple(map(int, args)))
-OmegaConf.register_new_resolver("tuple_bool", lambda *args: tuple(map(bool, args)))
 
 
 def warm_up_importance_sampling(model, scheduler: NoiseScheduler, loader, optimizer, n_rounds, backlog_size, timesteps,

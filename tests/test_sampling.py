@@ -6,6 +6,7 @@ from tqdm import tqdm
 from diffusion_lab.models.noise_scheduler import NoiseScheduler
 from diffusion_lab.utils.transforms import to_pil
 from diffusion_lab.utils.plot_images import show_save_images, save_gif, plot_lines
+from diffusion_lab.utils.resolvers import *
 
 from omegaconf import DictConfig
 
