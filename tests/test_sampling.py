@@ -103,16 +103,15 @@ def main(model, scheduler: NoiseScheduler, model_abs_path='steps/final.pth', tes
 		start_noise = torch.randn((n_images, 3, *resolution)).to(device)
 	x_t = start_noise
 	
+	# Image sampling with timesteps visible
+	if seed is not None:
+		torch.random.manual_seed(seed)
+	sampling_image_steps(model, scheduler, x_t, n_images=n_images, show_steps=show_steps, test_output_path=test_output_path)
+	
 	# Full image sampling animation
 	if seed is not None:
 		torch.random.manual_seed(seed)
 	sampling_gif(model, scheduler, x_t, n_images=n_images, frame_step=frame_step, test_output_path=test_output_path)
-	
-	# Image sampling with timesteps visible
-	if seed is not None:
-		torch.random.manual_seed(seed)
-	sampling_image_steps(model, scheduler, x_t, n_images=n_images, show_steps=show_steps,
-	                     test_output_path=test_output_path)
 	
 
 @hydra.main(config_path="../config", config_name="diffusion", version_base="1.3")
