@@ -6,7 +6,7 @@ import logging
 
 from omegaconf import DictConfig
 
-from datasets.dataset_diffusion import DiffusionDataset
+from diffusion_lab.datasets.dataset_diffusion import DiffusionDataset
 from diffusion_lab.sampling.sampling import sample_image
 from diffusion_lab.utils.transforms import to_tensor, to_pil
 from diffusion_lab.utils.plot_images import show_save_images
@@ -23,17 +23,17 @@ def main(model, scheduler, dataset, test_output_path, model_abs_path, device, **
 	sampled_img = to_pil(sample_image(model, scheduler)[0])
 	img_vec = np.array(sampled_img, dtype=np.float32).flatten()
 	
-	highes_similarity = float("-inf")
-	closes_img = None
+	highest_similarity = float("-inf")
+	closest_img = None
 	for img in dataset:
 		dataset_img = to_pil(img)
 		dataset_img_vec = np.array(dataset_img, dtype=np.float32).flatten()
 		cos_similarity = np.dot(img_vec, dataset_img_vec) / (np.linalg.norm(img_vec) * np.linalg.norm(dataset_img_vec))
-		if cos_similarity > highes_similarity:
-			log.info(f"New highes similarity: {float(cos_similarity) * 100:.2f}%")
-			highes_similarity = cos_similarity
-			closes_img = dataset_img
-	show_save_images([[sampled_img], [closes_img]], save_path=test_output_path)
+		if cos_similarity > highest_similarity:
+			log.info(f"New highest similarity: {float(cos_similarity) * 100:.2f}%")
+			highest_similarity = cos_similarity
+			closest_img = dataset_img
+	show_save_images([[sampled_img], [closest_img]], save_path=test_output_path)
 
 
 @hydra.main(config_path="../config", config_name="diffusion", version_base="1.3")
